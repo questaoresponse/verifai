@@ -96,5 +96,7 @@ def webhook(data):
     except json.JSONDecodeError:
         print("Erro ao decodificar a resposta do servidor.")
 
-io.connect('https://verifai-proxy.onrender.com')
+#io.connect('https://verifai-proxy.onrender.com')
+DEBUG = os.getenv("DEBUG") == "true"
+io.connect("http://127.0.0.1:12345" if DEBUG else "https://verifai-proxy.onrender.com")
 io.wait()
