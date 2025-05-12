@@ -92,7 +92,6 @@ DEBUG = os.getenv("DEBUG") == "true"
 if not DEBUG:
     send_requests()
 io.connect("http://127.0.0.1:12345" if DEBUG else "https://verifai-proxy.onrender.com")
-io.wait()
 
 if __name__ == "__main__":
     app.run("0.0.0.0", port=5000)
