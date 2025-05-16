@@ -4,12 +4,14 @@ from flask import Flask
 import requests
 import os
 import socketio
-import threading
+import json
+import threading, time
+import PIL.Image as pil
 from dotenv import load_dotenv
 
 load_dotenv()
 
-app = Flask("__main__")
+app = Flask(__name__)
 
 io = socketio.Client()
 
