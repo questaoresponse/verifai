@@ -1,16 +1,16 @@
 import instaloader
 import os
 import glob
-import subprocess
 import whisper
 import time
 import random
 import requests
-from dotenv import load_dotenv
+from moviepy import VideoFileClip
 
-load_dotenv()
+temp_path = "verifica_ai_temp"
 
-L = instaloader.Instaloader(dirname_pattern='verifica_ai_temp', download_video_thumbnails=False,
+# Fazer login no Instaloader
+L = instaloader.Instaloader(dirname_pattern=temp_path, download_video_thumbnails=False,
                                 download_geotags=False, save_metadata=False, download_comments=False,
                                 post_metadata_txt_pattern='')
 
@@ -27,17 +27,29 @@ else:
 # Baixar vídeo do Instagram
 def video_download(url, content):
     is_link_shared_reel = content["is_link_shared_reel"]
+    is_shared_reel = content["is_shared_reel"]
     if is_link_shared_reel:
         response = requests.get(content.url, allow_redirects=True)
         url = response.url
         content["shortcode"] = url.split("/")[-2] if url.endswith('/') else url.split("/")[-1]
     try:
-        post = instaloader.Post.from_shortcode(L.context, instaloader.Post.mediaid_to_shortcode(L.context, content["shortcode"])) if "shared_reel" in content else instaloader.Post.from_shortcode(L.context, content["shortcode"])
+        shortcode = str(content["shortcode"])
+        if is_shared_reel:
+            response = requests.get(content["video_src"], stream=True)
+            filename = f"{temp_path}/v_{str(shortcode)}.mp4"
+            with open(filename, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            return filename
+        
+        post = instaloader.Post.from_shortcode(L.context, content["shortcode"]) if "is_shared_reel" in content else instaloader.Post.from_shortcode(L.context, content["shortcode"])
         if post.is_video:
             print("Baixando vídeo...")
-            L.download_post(post, target='verifica_ai_temp')
+            L.download_post(post, target=temp_path)
             time.sleep(random.uniform(5, 10))
-            return True
+            filename = f"{username}_{shortcode}.mp4"
+            return filename
         else:
             print("Erro: o post não é um vídeo.")
             return False
@@ -45,52 +57,33 @@ def video_download(url, content):
         print("Erro ao tentar baixar o post:", str(e))
         return False
 
-# Extrair áudio com ffmpeg (com tratamento de erro)
-def extrair_audio():
-    arquivos = glob.glob("verifica_ai_temp/*.mp4")
-    if not arquivos:
-        raise FileNotFoundError("Nenhum arquivo de vídeo .mp4 encontrado.")
-
-    video_path = arquivos[0]
-    print(video_path)
-    audio_path = "verifica_ai_temp/audio.wav"
-
-    print(f"Convertendo vídeo: {video_path}")
-
-    comando = [
-        'ffmpeg',
-        '-y',
-        '-i', video_path,
-        '-vn',
-        '-ar', '16000',
-        '-ac', '1',
-        '-f', 'wav',
-        audio_path
-    ]
+# Extrair áudio com moviepy
+def extrair_audio(video_filename):
+    audio_path = ".".join(video_filename.split(".")[:-1]) + ".wav"
 
     try:
-        resultado = subprocess.run(comando, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        os.remove(video_path)
+        video = VideoFileClip(video_filename)
+        video.audio.write_audiofile(audio_path, fps=16000, nbytes=2, buffersize=2000, codec='pcm_s16le')
+        video.close()
+        os.remove(video_filename)
         return audio_path
-    except subprocess.CalledProcessError as e:
-        print("Erro na conversão com ffmpeg:")
-        print(e.stderr.decode())
-        os.remove(video_path)
-        raise
-
+    except Exception as e:
+        print("❌ Erro ao extrair áudio:", e)
+        
 # Transcrever com Whisper
-def transcrever_audio(caminho_audio):
-    print("Transcrevendo áudio com Whisper...")
+def transcrever_audio(audio_filename):
     model = whisper.load_model("base")  # Pode usar 'small', 'medium' ou 'large' se quiser mais precisão
-    result = model.transcribe(caminho_audio)
+    result = model.transcribe(os.path.abspath(audio_filename))
+    os.remove(audio_filename)
     return result["text"]
 
 # Função principal
 def process_video(url, is_object):
     print(f"Iniciando processamento do post: {url}\n")
-    if video_download(url, is_object):
+    filename = video_download(url, is_object)
+    if filename:
         try:
-            audio = extrair_audio()
+            audio = extrair_audio(filename)
             texto = transcrever_audio(audio)
             return texto
         except Exception as erro:

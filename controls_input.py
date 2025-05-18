@@ -40,11 +40,13 @@ def analyze(data):
         print(data)
         messaging_event = data['entry'][0]['messaging'][0]
         sender_id = messaging_event['sender']['id']
+        if sender_id == '17841474389423643' or "read" in messaging_event:
+            return
         instagram_account_id = data['entry'][0]['id']
         message = messaging_event["message"]
         content = {}
         if "attachments" in message:
-            content = { "shortcode": int(message["attachments"][0]["payload"]["reel_video_id"]), "caption": message["attachments"][0]["payload"]["title"], "is_reel": True, "is_shared_reel": True, "is_link_shared_reel": False  }
+            content = { "shortcode": int(message["attachments"][0]["payload"]["reel_video_id"]), "video_src": message["attachments"][0]["payload"]["url"], "caption": message["attachments"][0]["payload"]["title"], "is_reel": True, "is_shared_reel": True, "is_link_shared_reel": False  }
         else:
             content["text"] = messaging_event['message'].get('text')
             if content["text"].startswith("https://wwww.instagram.com/share/"):
