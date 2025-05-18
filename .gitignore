@@ -1,0 +1,4 @@
+.env
+__pycache__
+session/*
+verifica_ai_temp/*
