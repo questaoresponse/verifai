@@ -26,14 +26,13 @@ else:
 
 # Baixar vídeo do Instagram
 def video_download(url, content):
-    is_shared_reel = content["is_shared_reel"]
-    if is_shared_reel:
+    is_link_shared_reel = content["is_link_shared_reel"]
+    if is_link_shared_reel:
         response = requests.get(content.url, allow_redirects=True)
         url = response.url
         content["shortcode"] = url.split("/")[-2] if url.endswith('/') else url.split("/")[-1]
-    print(content["shortcode"])
     try:
-        post = instaloader.Post(L.context,  instaloader.Post.mediaid_to_shortcode(L.context, content["shortcode"])) if is_shared_reel else instaloader.Post.from_mediaid(L.context, content["shortcode"])
+        post = instaloader.Post.from_shortcode(L.context, instaloader.Post.mediaid_to_shortcode(L.context, content["shortcode"])) if "shared_reel" in content else instaloader.Post.from_shortcode(L.context, content["shortcode"])
         if post.is_video:
             print("Baixando vídeo...")
             L.download_post(post, target='verifica_ai_temp')

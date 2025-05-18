@@ -44,12 +44,12 @@ def analyze(data):
         message = messaging_event["message"]
         content = {}
         if "attachments" in message:
-            content = { "shortcode": int(message["attachments"][0]["payload"]["reel_video_id"]), "caption": message["attachments"][0]["payload"]["title"], "is_reel": True, "is_shared_reel": False  }
+            content = { "shortcode": int(message["attachments"][0]["payload"]["reel_video_id"]), "caption": message["attachments"][0]["payload"]["title"], "is_reel": True, "is_shared_reel": True, "is_link_shared_reel": False  }
         else:
             content["text"] = messaging_event['message'].get('text')
             if content["text"].startswith("https://wwww.instagram.com/share/"):
                 content["is_reel"] = True
-                content["is_shared_reel"] = True
+                content["is_link_shared_reel"] = True
             elif content["text"].startswith("https://www.instagram.com/p/"):
                 content["is_reel"] = True
                 content["shortcode"] = content["text"].split("/")[-2] if content["text"].endswith("/") else content["text"].split("/")[-1] 
