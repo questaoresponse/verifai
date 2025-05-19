@@ -4,6 +4,9 @@ from PIL import Image
 from io import BytesIO
 import json
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 API_KEY_GEMINI = os.getenv("API_KEY_GEMINI")

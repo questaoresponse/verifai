@@ -1,42 +1,56 @@
-from controls_input import analyze
-
 from flask import Flask
 import requests
 import os
 import socketio
 import threading
+from verifai import Verifai
+from controls_input import ControlsInput
 
-app = Flask(__name__)
+class Server(ControlsInput):
+    def __init__(self):
+        Verifai.__init__(self)
+        ControlsInput.__init__(self)
 
-io = socketio.Client()
+        if os.path.isfile(f"{os.getcwd()}/session/{self.username}"):
+            self.L.load_session_from_file(self.username, filename=f"{os.getcwd()}/session/{self.username}")  # se já tiver salvo antes
+        else:
+            self.L.login(self.username, self.password)  # Vai fazer o login e manter a sessão
+            self.L.save_session_to_file(filename=f"{os.getcwd()}/session/{self.username}")
 
-@io.event
-def connect():
-    print("Conectado ao servidor.")
+        self.app = Flask(__name__)
 
-@io.event
-def disconnect():
-    print("Desconectado do servidor.")
+        self.io = socketio.Client()
 
-#13c704a8b51257b55615159eeb5dc4e8
+        self.register_routes()
 
+        self.io.connect("https://verifai-proxy-uxrm.onrender.com")
 
+        DEBUG = self.DEBUG == "true"
+        if not DEBUG:
+            self.send_requests()
 
-@io.event
-def webhook(data):
-    analyze(data)
+    def connect(self):
+        print("Conectado ao servidor.")
 
-@app.route("/", methods=["GET"])
-def send_requests():
-    try:
-        requests.get("https://verifai.onrender.com")
-    except Exception as e:
-        print("error", e)
-    threading.Timer(10, send_requests).start()  # executa a cada 2 segundos
-    return None
-#io.connect('https://verifai-proxy.onrender.com')
-DEBUG = os.getenv("DEBUG") == "true"
-if not DEBUG:
-    send_requests()
-io.connect("https://verifai-proxy-uxrm.onrender.com")
-# io.connect("http://127.0.0.1:12345" if DEBUG else "https://verifai-proxy.onrender.com")
+    def disconnect(self):
+        print("Desconectado do servidor.")
+
+    def register_routes(self):
+        self.io.on("connect", self.connect)
+        self.io.on("disconnect", self.disconnect)
+        self.io.on("webhook", self.webhook)
+
+    #13c704a8b51257b55615159eeb5dc4e8
+
+    def webhook(self, data):
+        self.analyze(data)
+
+    def send_requests(self):
+        try:
+            requests.get("https://verifai.onrender.com")
+        except Exception as e:
+            print("error", e)
+        threading.Timer(10, self.send_requests).start()  # executa a cada 2 segundos
+        return None
+        #io.connect('https://verifai-proxy.onrender.com')
+    # io.connect("http://127.0.0.1:12345" if DEBUG else "https://verifai-proxy.onrender.com")

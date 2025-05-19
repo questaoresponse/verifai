@@ -5,12 +5,11 @@ import zipfile
 import tarfile
 import requests
 from pathlib import Path
-import whisper
 import json
 
 config_data = {}
 
-if os.path.exists("config.json"):
+if os.path.exists("config_data.json"):
     print("Ambiente já configurado.")
     exit(0)
 
@@ -31,7 +30,7 @@ def baixar_ffmpeg(destino_dir):
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
         with open(zip_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=65536):
+            for chunk in r.iter_content(chunk_size=1024):
                 f.write(chunk)
 
     print("Extraindo FFmpeg...")
@@ -59,7 +58,7 @@ def baixar_ffmpeg(destino_dir):
 
 Path(os.getcwd() + "/libs/ffmpeg").mkdir(exist_ok=True)
 ffmpeg_path = baixar_ffmpeg("libs/ffmpeg")
-config_data["ffmpeg_path"] = ffmpeg_path    
+config_data["ffmpeg_path"] = os.path.basename(ffmpeg_path)   
 
 with open("config_data.json", "w") as f:
     json.dump(config_data, f, indent=4)
