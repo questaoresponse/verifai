@@ -1,6 +1,9 @@
 .env
 __pycache__
 session/*
+!session/.gitkeep
 verifica_ai_temp/*
+!verifica_ai_temp/.gitkeep
 libs/*
+!libs/.gitkeep
 config_data.json

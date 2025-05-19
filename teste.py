@@ -1,19 +1,37 @@
-import os
-import json
-import whisper
+# import requests
+# import urllib
+# from newspaper import Article
 
-config = None
+# query = "java"
+# url = f"https://google.com/?q={urllib.parse.quote(query)}&format=json"
 
-with open("config_data.json") as f:
-    config = json.load(f)
+# res = requests.get(url)
+# data = res.text
 
-os.environ["PATH"] = os.environ.get("PATH", "") + os.pathsep + config["ffmpeg_path"]
-
-audio_filename = "verifica_ai_temp/v_18054194003002491.wav"
-audio_filename = os.path.abspath(audio_filename)
+# print(data)
+# # Saída: Ol%C3%A1%2C%20mundo%21%20Python%20%26%20caf%C3%A9
 
 
-model = whisper.load_model("base")  # Pode usar 'small', 'medium' ou 'large' se quiser mais precisão
-result = model.transcribe(audio_filename)
-os.remove(audio_filename)
-print(result["text"])
+
+# url = data["AbstractURL"]
+# artigo = Article(url, language='pt')
+# artigo.download()
+# artigo.parse()
+
+# print(artigo.title)
+# print(artigo.text)
+
+#newspaper3k lxml_html_clean
+
+from playwright.sync_api import sync_playwright
+
+query = "java"
+url = f"https://duckduckgo.com/?q={query}&format=json"
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
+    page.goto(url)
+    page.wait_for_selector(".conteudo")  # espera o carregamento
+    html = page.content()
+    browser.close()

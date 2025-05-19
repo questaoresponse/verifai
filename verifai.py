@@ -8,8 +8,10 @@ load_dotenv()
 
 class Verifai:
     def __init__(self):
+        self.temp_path = "verifica_ai_temp"
+
         self.L = instaloader.Instaloader(
-            dirname_pattern='verifica_ai_temp',
+            dirname_pattern=self.temp_path,
             download_videos=False,
             download_video_thumbnails=False,
             download_geotags=False,
@@ -26,5 +28,3 @@ class Verifai:
 
         generai.configure(api_key=self.API_KEY_GEMINI)
         self.model = generai.GenerativeModel("gemini-1.5-flash")
-
-        self.temp_path = "verifica_ai_temp"
