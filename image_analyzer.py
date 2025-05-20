@@ -62,6 +62,6 @@ class ImageAnalyzer(Verifai):
    
         #                 response = self.model.generate_content([prompt,img])
         # shortcode = instaloader.Post.mediaid_to_shortcode(18075837601871193)
-        img = pil.open(filename)
-        return [ img, "image" ]
+        # img = pil.open(filename)
+        return [ filename, "image" ]
     

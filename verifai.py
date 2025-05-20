@@ -1,10 +1,21 @@
 import instaloader
 import os
-import google.generativeai as generai
+from google import genai
 from dotenv import load_dotenv
+from google.genai.types import Tool, GoogleSearch
 
 # Carrega variáveis de ambiente
 load_dotenv()
+
+# models = [
+    # gemini-1.5-flash
+    # gemini-1.5-flash-8b
+    # gemini-1.5-pro
+    # gemini-2.0-flash
+    # gemini-2.0-flash-lite
+    # gemini-2.0-flash-preview-image-generation
+    # gemini-2.5-flash-preview-04-17
+# ]
 
 class Verifai:
     def __init__(self):
@@ -26,5 +37,8 @@ class Verifai:
         self.PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
         self.DEBUG = os.getenv("DEBUG")
 
-        generai.configure(api_key=self.API_KEY_GEMINI)
-        self.model = generai.GenerativeModel("gemini-1.5-flash")
+        self.client = genai.Client(api_key=self.API_KEY_GEMINI)
+
+        self.google_search_tool = Tool(
+            google_search = GoogleSearch()
+        )

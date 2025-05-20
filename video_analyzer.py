@@ -4,6 +4,7 @@ import time
 import random
 import requests
 import subprocess
+import PIL.Image as pil
 from faster_whisper import WhisperModel
 from verifai import Verifai
 
@@ -56,6 +57,8 @@ class VideoAnalyzer(Verifai):
     # Função principal
     def process_video(self, filename):
         try:
+            return [ filename, "video" ]
+
             audio = self.extrair_audio(filename)
             texto = self.transcrever_audio(audio)
             return [ texto, "video" ]
