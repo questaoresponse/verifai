@@ -98,6 +98,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
             content = {}
             prompt_content = []
             file = None
+            filename = None
             if "attachments" in message:
                 if message["attachments"][0]["type"]=="ig_reel":
                     content = { "type": "video", "shortcode": int(message["attachments"][0]["payload"]["reel_video_id"]), "file_src": message["attachments"][0]["payload"]["url"], "caption": message["attachments"][0]["payload"]["title"], "is_media": True, "is_shared_reel": True, "is_link_shared_reel": False  }
@@ -121,6 +122,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
                 content_data, content_type = self.process_content(content)
 
                 file = self.upload_file(content_data)
+                filename = content_data
 
                 if content_type == "video":
                     prompt_content=[
@@ -149,6 +151,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
 
             if file:
                 self.client.files.delete(name = file.name)
+                os.remove(filename)
             
             for part in response.candidates[0].content.parts:
                 text += part.text
