@@ -153,6 +153,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
                 self.client.files.delete(name = file.name)
                 os.remove(filename)
             
+            text = ""
             for part in response.candidates[0].content.parts:
                 text += part.text
             

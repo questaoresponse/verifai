@@ -23,10 +23,10 @@ class Server(ControlsInput):
 
         self.register_routes()
 
-        self.io.connect("https://verifai-proxy-uxrm.onrender.com")
-
         DEBUG = self.DEBUG == "true"
-        if not DEBUG:
+        if DEBUG:
+            self.io.connect("https://verifai-proxy-uxrm.onrender.com")
+        else:
             self.send_requests()
 
     def connect(self):
@@ -38,16 +38,21 @@ class Server(ControlsInput):
     def register_routes(self):
         self.io.on("connect", self.connect)
         self.io.on("disconnect", self.disconnect)
-        self.io.on("webhook", self.webhook)
+        self.io.on("webhook", self.webhook_socketio)
+
+        self.app.add_url_rule('/webhook', view_func=self.webhook_flask)
 
     #13c704a8b51257b55615159eeb5dc4e8
 
-    def webhook(self, data):
+    def webhook_socketio(self, data):
         self.analyze(data)
+
+    def webhook_flask(self, data):
+        self.analyze(data.get_json())
 
     def send_requests(self):
         try:
-            requests.get("https://verifai.onrender.com")
+            requests.get("https://verifai-8z3i.onrender.com")
         except Exception as e:
             print("error", e)
         threading.Timer(10, self.send_requests).start()  # executa a cada 2 segundos
