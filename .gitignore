@@ -1,6 +1,6 @@
 # session/*
 !session/.gitkeep
-verifica_ai_temp/*
+verifica_ai_temp/
 !verifica_ai_temp/.gitkeep
 libs/*
 .venv/

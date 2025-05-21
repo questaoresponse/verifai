@@ -22,9 +22,10 @@ class Verifai:
         self.temp_path = "verifica_ai_temp"
 
         self.L = instaloader.Instaloader(
+            filename_pattern="vl_{shortcode}",
             dirname_pattern=self.temp_path,
-            download_videos=False,
-            download_video_thumbnails=False,
+            download_videos=True,
+            download_video_thumbnails=True,
             download_geotags=False,
             save_metadata=False,
             download_comments=False,
@@ -36,6 +37,8 @@ class Verifai:
         self.API_KEY_GEMINI = os.getenv("API_KEY_GEMINI")
         self.PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
         self.DEBUG = os.getenv("DEBUG")
+        self.API_KEY = os.getenv('GOOGLE_API_KEY')
+        self.CSE_ID = os.getenv('GOOGLE_CSE_ID')
 
         self.client = genai.Client(api_key=self.API_KEY_GEMINI)
 

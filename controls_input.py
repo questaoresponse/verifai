@@ -2,20 +2,22 @@ import requests
 import os
 import instaloader
 import time
-import random
 import traceback
 from dotenv import load_dotenv
 from google import genai
 from google.genai.types import GenerateContentConfig
 from video_analyzer import VideoAnalyzer
 from image_analyzer import ImageAnalyzer
+from internet_analyzer import InternetAnalyzer
 
 load_dotenv()
 
 
-class ControlsInput(VideoAnalyzer, ImageAnalyzer):
+class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
     def __init__(self):
         pass
+
+
     def upload_file(self, filename):
         file = self.client.files.upload(file = filename)
 
@@ -25,7 +27,18 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
             time.sleep(1)
 
         return file
+    
+    def get_shortcode_from_url(self, url):
+        url = url.split("?")[0]
+        return url.split("/")[-2] if url.endswith("/") else url.split("/")[-1]
 
+    def get_shortcode_from_mediaid(self, media_id):
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        shortcode = ""
+        while media_id > 0:
+            media_id, remainder = divmod(media_id, 64)
+            shortcode = alphabet[remainder] + shortcode
+        return shortcode
     # Processa o conteudo do link e retorna o tipo do link e retorna o nome do arquivo baixado e o tipo dele
     def process_content(self, content):
         is_link_shared_reel = content["is_link_shared_reel"]
@@ -33,15 +46,16 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
         if is_link_shared_reel:
             response = requests.get(content["text"], allow_redirects=True)
             url = response.url
-            content["shortcode"] = url.split("/")[-2] if url.endswith('/') else url.split("/")[-1]
+            content["shortcode"] = self.get_shortcode_from_url(url)
         try:  
-            shortcode = str(content["shortcode"])
-            if is_shared_reel or content["type"] == "video":
+            shortcode = content["shortcode"]
+            if is_shared_reel or "type" in content and content["type"] == "video":
                 response = requests.get(content["file_src"], stream=True)
                 filename = None
                 if content["type"] == "video":
                     filename = f"{self.temp_path}/v_{str(shortcode)}.mp4"
                 else:
+                    post = instaloader.Post.from_shortcode(self.L.context, self.get_shortcode_from_mediaid(int(content["shortcode"])))
                     filename = f"{self.temp_path}/v_{str(shortcode)}.jpg"
                 with open(filename, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
@@ -54,13 +68,12 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
             else:               
                 post = instaloader.Post.from_shortcode(self.L.context, shortcode)
                 self.L.download_post(post, target="verifica_ai_temp")
-                time.sleep(10)
                 filename = ""
                 if post.is_video:
-                    filename = f"{self.username}_{shortcode}.mp4"
+                    filename = f"{self.temp_path}/vl_{shortcode}.mp4"
                     return self.process_video(filename)
                 else:
-                    filename = f"{self.username}_{shortcode}.jpg"
+                    filename = f"{self.temp_path}/vl_{shortcode}.jpg"
                     return self.process_image(filename)
 
         except Exception as e:
@@ -109,14 +122,14 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
             else:
                 content["text"] = messaging_event['message'].get('text')
                 if content["text"].startswith("https://www.instagram.com/share/"):
-                    content["is_reel"] = True
+                    content["is_media"] = True
                     content["is_link_shared_reel"] = True
                     content["is_shared_reel"] = False
                 elif content["text"].startswith("https://www.instagram.com/p/") or content["text"].startswith("https://www.instagram.com/reel/"):
-                    content["is_reel"] = True
+                    content["is_media"] = True
                     content["is_link_shared_reel"] = False
                     content["is_shared_reel"] = False
-                    content["shortcode"] = content["text"].split("/")[-2] if content["text"].endswith("/") else content["text"].split("/")[-1]
+                    content["shortcode"] = self.get_shortcode_from_url(content["text"])
             if "is_media" in content:
                 caption = content["caption"] if "caption" in content else ""
                 content_data, content_type = self.process_content(content)
@@ -138,8 +151,34 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer):
 
             else:
                 text = content["text"]
-                prompt_content = [f"\"{text}\".Faça a análise desse texto. Primeiramente, me diga se é fake news ou não diretamente. Depois diga os motivos, podendo realizar uma pesquisa sobre o assunto. OBS: Responda com no máximo 1000 caracteres."]
-            
+
+                scraped_text = self.web_search_api(text)
+
+                if scraped_text.startswith("Não foi possível realizar a pesquisa"):
+                    # Gerar resposta de fallback sem dados de pesquisa
+                    fallback_response = (
+                        "Desculpe, não consegui verificar esta informação no momento devido a "
+                        "um problema técnico. Por favor, tente novamente mais tarde ou "
+                        "consulte fontes oficiais sobre este assunto."
+                    )
+                    self.send_message_to_user(instagram_account_id, sender_id, fallback_response)
+                    return
+                
+                base_prompt = (
+                        f"Analise a mensagem: \"{text}\"\n\n"
+                        "Verifique se é fake news, respondendo 'É fake news' ou 'Não é fake news' no começo da resposta (Use um emoji de ✅ ou ❌, ou ◽). Se não foro"
+                        "e classifique-a (dentro de parenteses) como: Clickbait, conteúdo enganoso, "
+                        "fora de contexto, manipulado, etc. Depois diga os motivos. "
+                        "Não utilize markdown na resposta. OBS: Responda com no máximo 1000 caracteres."
+                        "Use as fontes de pesquisas para analisar a veracidade do fato."
+                        "Se for apenas um prompt qualquer, sem necessidade de análise, retorne apenas a resposta. "
+                )
+
+                if scraped_text and not scraped_text.startswith("Não foi possível"):
+                    prompt_content = [ base_prompt + "\n\nCONTEXTO DE PESQUISA PARA VERIFICAÇÃO:\n" + scraped_text ]
+                else:
+                    prompt_content = [ base_prompt ]
+
             response = self.client.models.generate_content(
                 model="gemini-2.0-flash",
                 contents = prompt_content,

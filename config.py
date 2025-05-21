@@ -61,4 +61,4 @@ ffmpeg_path = baixar_ffmpeg("libs/ffmpeg")
 config_data["ffmpeg_path"] = os.path.basename(ffmpeg_path)   
 
 with open("config_data.json", "w") as f:
-    json.dump(config_data, f, indent=4)
+    f.write(json.dump(config_data, f, indent=4))
