@@ -24,7 +24,7 @@ def get_text_from_prompt(response):
     
     return response.text
 
-text = "Papa Francisco morreu hoje e está em eleição para um novo papa."
+text = "papa francisco segurou a camisa do palmeiras"
 
 prompt1 = [
     (
@@ -32,26 +32,22 @@ prompt1 = [
         " Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi"
     )
 ]
-response_text = None
 response_text = get_text_from_prompt(client.models.generate_content(
     model=model_id,
     contents=prompt1,
 ))
-if (response_text.startswith("Sim") or 1==1):
-    response_text2= response_text[3:]
-    response_text = get_text_from_prompt(
-        client.models.generate_content(
-            model=model_id,
-            contents= f"""Com base na mensagem: "{text}", pesquise detalhadamente os seguintes assuntos: "{response_text2}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes.
-                """,
-                config=GenerateContentConfig(
-                tools=[google_search_tool],
-                response_modalities=["TEXT"],
-            )
+
+response_text = get_text_from_prompt(
+    client.models.generate_content(
+        model=model_id,
+        contents= f"""Com base na mensagem: "{text}", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes.
+            """,
+            config=GenerateContentConfig(
+            tools=[google_search_tool],
+            response_modalities=["TEXT"],
         )
     )
-else:
-    pass
+)
 # print(response_text)
 response_text = get_text_from_prompt(client.models.generate_content(
     model=model_id,

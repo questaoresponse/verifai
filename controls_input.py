@@ -28,17 +28,19 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
 
         return file
     
+    def get_text_from_prompt(self, response):
+        if "candidates" in response:
+            text = ""
+            for part in response.candidates[0].content.parts:
+                text += part.text
+            return text
+        
+        return response.text
+
     def get_shortcode_from_url(self, url):
         url = url.split("?")[0]
         return url.split("/")[-2] if url.endswith("/") else url.split("/")[-1]
 
-    def get_shortcode_from_mediaid(self, media_id):
-        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-        shortcode = ""
-        while media_id > 0:
-            media_id, remainder = divmod(media_id, 64)
-            shortcode = alphabet[remainder] + shortcode
-        return shortcode
     # Processa o conteudo do link e retorna o tipo do link e retorna o nome do arquivo baixado e o tipo dele
     def process_content(self, content):
         is_link_shared_reel = content["is_link_shared_reel"]
@@ -55,7 +57,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                 if content["type"] == "video":
                     filename = f"{self.temp_path}/v_{str(shortcode)}.mp4"
                 else:
-                    post = instaloader.Post.from_shortcode(self.L.context, self.get_shortcode_from_mediaid(int(content["shortcode"])))
+                    post = instaloader.Post.from_mediaid(self.L.context, content["shortcode"])
                     filename = f"{self.temp_path}/v_{str(shortcode)}.jpg"
                 with open(filename, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
@@ -103,14 +105,13 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
             messaging_event = data['entry'][0]['messaging'][0]
             sender_id = messaging_event['sender']['id']
             if sender_id == '17841474389423643' or "read" in messaging_event:
-                return
+                return None
             instagram_account_id = data['entry'][0]['id']
             if not ("message" in messaging_event):
-                return
+                return None
             message = messaging_event["message"]
             content = {}
             prompt_content1 = []
-            prompt_content2 = []
             file = None
             filename = None
             if "attachments" in message:
@@ -148,59 +149,107 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                         file
                     ]
 
+                    prompt1 = [
+                        f"Video: \"{text}\"\n. Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
+                        file
+                    ]
+                    response_text = self.get_text_from_prompt(self.client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents=prompt1,
+                    ))
+
+                    response_text = self.get_text_from_prompt(
+                        self.client.models.generate_content(
+                            model="gemini-2.0-flash",
+                            contents= f"""Com base na mensagem: "{text}", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si.
+                                """,
+                                config=GenerateContentConfig(
+                                tools=[self.google_search_tool],
+                                response_modalities=["TEXT"],
+                            )
+                        )
+                    )
+
+                    # print(response_text)
+                    response_text = self.get_text_from_prompt(self.client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents=f"Analise a mensagem \"{text}\". Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                    ))
+                    self.send_message_to_user(instagram_account_id, sender_id, response_text)
+                    return None
+
                 else:
                     prompt_content1=[
                         f"Faça a análise detalhadamente do conteúdo presente nessa imagem, e, para analisar se é fake news ou não, me diga exatamente 'Sim' caso precise de fontes da web pra melhor resultado e não caso contrário. Após essa resposta, me diga exatamente separado por linhas, o que precisa ser pesquisado.",
                         file
                     ]
-                    prompt_content2=[
-                        f"Faça a análise detalhadamente do conteúdo presente nessa imagem. Primeiramente, me diga: 'É fake news' ou 'Não é fake news'. Depois diga os motivos, podendo realizar uma pesquisa sobre o assunto. OBS: Responda com no máximo 1000 caracteres.",
+
+                    prompt1 = [
+                        f"Faça a análise detalhadamente do conteúdo presente nessa imagem, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
                         file
                     ]
+                    response_text = self.get_text_from_prompt(self.client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents=prompt1,
+                    ))
+
+                    response_text = self.get_text_from_prompt(
+                        self.client.models.generate_content(
+                            model="gemini-2.0-flash",
+                            contents=[
+                                f"""Com base no conteúdo da imagem", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes.
+                                """,
+                                file
+                            ],
+                            config=GenerateContentConfig(
+                                tools=[self.google_search_tool],
+                                response_modalities=["TEXT"],
+                            )
+                        )
+                    )
+
+                    # print(response_text)
+                    response_text = self.get_text_from_prompt(self.client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents=[
+                            f"Analise detalhadamente o conteúdo presente na imagem. Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                            file
+                        ]
+                    ))
+                    self.send_message_to_user(instagram_account_id, sender_id, response_text)
+                    return None
 
             else:
                 text = content["text"]
 
-                scraped_text = self.web_search_api(text)
-
-                if scraped_text.startswith("Não foi possível realizar a pesquisa"):
-                    # Gerar resposta de fallback sem dados de pesquisa
-                    fallback_response = (
-                        "Desculpe, não consegui verificar esta informação no momento devido a "
-                        "um problema técnico. Por favor, tente novamente mais tarde ou "
-                        "consulte fontes oficiais sobre este assunto."
-                    )
-                    self.send_message_to_user(instagram_account_id, sender_id, fallback_response)
-                    return
-                
-                base_prompt = (
-                        f"Analise a mensagem: \"{text}\"\n\n"
-                        "Verifique se é fake news, respondendo 'É fake news' ou 'Não é fake news' no começo da resposta (Use um emoji de ✅ ou ❌, ou ◽). Se não foro"
-                        "e classifique-a (dentro de parenteses) como: Clickbait, conteúdo enganoso, "
-                        "fora de contexto, manipulado, etc. Depois diga os motivos."
-                        "Não utilize markdown na resposta. OBS: Responda com no máximo 1000 caracteres."
-                        "Use as fontes de pesquisas para analisar a veracidade do fato."
-                        "Se for apenas um prompt qualquer, sem necessidade de análise, retorne apenas a resposta. "
-                )
-                prompt_content1 = [ 
-                    (
-                        f"Analise a mensagem: \"{text}\"\n\n.",
-                        " Para verificar se é fake news ou não, me diga exatamente 'Sim' caso precise de fontes da web pra melhor resultado e não caso contrário. Após essa resposta, me diga exatamente separado por linhas, o que precisa ser pesquisado. OBS: Não diga mais nada além do que pedi"
-                    )
+                prompt1 = [
+                    f"Analise a mensagem: \"{text}\"\n. Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi"
                 ]
-                if scraped_text and not scraped_text.startswith("Não foi possível"):
-                    prompt_content = [ base_prompt + "\n\nCONTEXTO DE PESQUISA PARA VERIFICAÇÃO:\n" + scraped_text ]
-                else:
-                    prompt_content = [ base_prompt ]
+                response_text = self.get_text_from_prompt(self.client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt1,
+                ))
 
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents = prompt_content1,
-                config = GenerateContentConfig(
-                    tools = [self.google_search_tool],
-                    response_modalities = ["TEXT"],
+                response_text = self.get_text_from_prompt(
+                    self.client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents= f"""Com base na mensagem: "{text}", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si.
+                            """,
+                            config=GenerateContentConfig(
+                            tools=[self.google_search_tool],
+                            response_modalities=["TEXT"],
+                        )
+                    )
                 )
-            )
+
+                # print(response_text)
+                response_text = self.get_text_from_prompt(self.client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=f"Analise a mensagem \"{text}\". Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                ))
+                self.send_message_to_user(instagram_account_id, sender_id, response_text)
+                return None
+            
             response = self.client.models.generate_content(
                 model="gemini-2.0-flash",
                 contents = prompt_content1,
