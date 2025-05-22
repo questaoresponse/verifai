@@ -109,6 +109,7 @@ class InternetAnalyzer(Verifai):
                     url = item['link']
                     title = item.get('title', 'Sem título')
                     snippet = item.get('snippet', '')
+                    print(item)
                     extra_info += f"\n\nFONTE: {title} ({url})\n{snippet}\n"
             
             if not extra_info:

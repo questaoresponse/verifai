@@ -109,7 +109,8 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                 return
             message = messaging_event["message"]
             content = {}
-            prompt_content = []
+            prompt_content1 = []
+            prompt_content2 = []
             file = None
             filename = None
             if "attachments" in message:
@@ -138,13 +139,21 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                 filename = content_data
 
                 if content_type == "video":
-                    prompt_content=[
+                    prompt_content1=[
+                        f"Legenda: \"{caption}\". Faça a análise do conteúdo desse video, e, para analisar se é fake news ou não, me diga exatamente 'Sim' caso precise de fontes da web pra melhor resultado e não caso contrário. Após essa resposta, me diga exatamente separado por linhas, o que precisa ser pesquisado.",
+                        file
+                    ]
+                    prompt_content2=[
                         f"Legenda: \"{caption}\". Faça a análise do conteúdo desse vídeo, tanto informações visuais (analizando a veracidade dos conteúdos mostrados) quanto audio, também a legenda fornecida. Primeiramente, me diga: 'É fake news' ou 'Não é fake news'. Depois diga os motivos, podendo realizar uma pesquisa sobre o assunto. OBS: Responda com no máximo 1000 (mil) caracteres.",
                         file
                     ]
 
                 else:
-                    prompt_content=[
+                    prompt_content1=[
+                        f"Faça a análise detalhadamente do conteúdo presente nessa imagem, e, para analisar se é fake news ou não, me diga exatamente 'Sim' caso precise de fontes da web pra melhor resultado e não caso contrário. Após essa resposta, me diga exatamente separado por linhas, o que precisa ser pesquisado.",
+                        file
+                    ]
+                    prompt_content2=[
                         f"Faça a análise detalhadamente do conteúdo presente nessa imagem. Primeiramente, me diga: 'É fake news' ou 'Não é fake news'. Depois diga os motivos, podendo realizar uma pesquisa sobre o assunto. OBS: Responda com no máximo 1000 caracteres.",
                         file
                     ]
@@ -168,12 +177,17 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                         f"Analise a mensagem: \"{text}\"\n\n"
                         "Verifique se é fake news, respondendo 'É fake news' ou 'Não é fake news' no começo da resposta (Use um emoji de ✅ ou ❌, ou ◽). Se não foro"
                         "e classifique-a (dentro de parenteses) como: Clickbait, conteúdo enganoso, "
-                        "fora de contexto, manipulado, etc. Depois diga os motivos. "
+                        "fora de contexto, manipulado, etc. Depois diga os motivos."
                         "Não utilize markdown na resposta. OBS: Responda com no máximo 1000 caracteres."
                         "Use as fontes de pesquisas para analisar a veracidade do fato."
                         "Se for apenas um prompt qualquer, sem necessidade de análise, retorne apenas a resposta. "
                 )
-
+                prompt_content1 = [ 
+                    (
+                        f"Analise a mensagem: \"{text}\"\n\n.",
+                        " Para verificar se é fake news ou não, me diga exatamente 'Sim' caso precise de fontes da web pra melhor resultado e não caso contrário. Após essa resposta, me diga exatamente separado por linhas, o que precisa ser pesquisado. OBS: Não diga mais nada além do que pedi"
+                    )
+                ]
                 if scraped_text and not scraped_text.startswith("Não foi possível"):
                     prompt_content = [ base_prompt + "\n\nCONTEXTO DE PESQUISA PARA VERIFICAÇÃO:\n" + scraped_text ]
                 else:
@@ -181,12 +195,21 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
 
             response = self.client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents = prompt_content,
+                contents = prompt_content1,
                 config = GenerateContentConfig(
                     tools = [self.google_search_tool],
                     response_modalities = ["TEXT"],
                 )
             )
+            response = self.client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents = prompt_content1,
+                config = GenerateContentConfig(
+                    tools = [self.google_search_tool],
+                    response_modalities = ["TEXT"],
+                )
+            )
+
 
             if file:
                 self.client.files.delete(name = file.name)
