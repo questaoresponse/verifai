@@ -45,3 +45,5 @@ class Verifai:
         self.google_search_tool = Tool(
             google_search = GoogleSearch()
         )
+
+        self.model = "gemini-2.0-flash"

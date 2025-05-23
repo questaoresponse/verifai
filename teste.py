@@ -1,85 +1,47 @@
-import requests
-from bs4 import BeautifulSoup
-import time
-import re
+import os
+import google.generativeai as genai
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+from dotenv import load_dotenv
 
-def limpar_texto(texto):
-    # Remove espaços extras e quebras de linha
-    texto = re.sub(r'\s+', ' ', texto).strip()
-    # Remove caracteres especiais
-    texto = re.sub(r'[^\w\s.,!?-]', '', texto)
-    return texto
+load_dotenv()
 
-def extrair_conteudo_pagina(url):
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-        }
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
+# 1. Configure a API do Gemini
+genai.configure(api_key=os.getenv("API_KEY_GEMINI"))
 
-        # Tenta encontrar o primeiro parágrafo relevante
-        # Procura em várias tags onde normalmente está o conteúdo principal
-        paragrafos = soup.find_all(['p', 'article', 'div.content', 'div.article-content'])
-        primeiro_paragrafo = ""
+# 2. Dados de exemplo
+docs = [
+    "O Sol é a estrela no centro do sistema solar.",
+    "A Lua é o único satélite natural da Terra.",
+    "A água ferve a 100 graus Celsius ao nível do mar.",
+    "O Brasil tem desigualdade",
+    "As pessoas irão morrer em 2040",
+    "Universidades dos EUA"
+]
+titles = ["Sol", "Lua", "Água"]  # títulos opcionais
 
-        for p in paragrafos:
-            texto = p.get_text().strip()
-            if len(texto) > 100:  # Considera apenas parágrafos com mais de 100 caracteres
-                primeiro_paragrafo = limpar_texto(texto)
-                break
+# 3. Gerar embeddings
+model_emb = SentenceTransformer("all-MiniLM-L6-v2")
+doc_embeddings = model_emb.encode(docs, normalize_embeddings=True)
 
-        return primeiro_paragrafo
-    except Exception as e:
-        return f"Erro ao extrair conteúdo: {str(e)}"
+# 4. Criar índice FAISS
+index = faiss.IndexFlatL2(doc_embeddings.shape[1])
+index.add(np.array(doc_embeddings))
 
-def buscar_duckduckgo(query, max_results=5):
-    url = f"https://html.duckduckgo.com/html/?q={query.replace(' ', '+')}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    results = []
+# 5. Fazer uma consulta
+query = "Maior universidade do Brasil"
+query_embedding = model_emb.encode([query], normalize_embeddings=True)
+_, top_k = index.search(query_embedding, k=1)
 
-    for result in soup.find_all('div', class_='result', limit=max_results):
-        title_tag = result.find('a', class_='result__a')
-        snippet_tag = result.find('a', class_='result__snippet')
+# 6. Recuperar o documento relevante
+relevant_doc = docs[top_k[0][0]]
 
-        if title_tag:
-            link = title_tag['href']
-            title = limpar_texto(title_tag.get_text())
-            snippet = limpar_texto(snippet_tag.get_text()) if snippet_tag else ''
+# 7. Gerar resposta com Gemini
+model = genai.GenerativeModel("gemini-2.0-flash")
+response = model.generate_content(f"Responda com base neste texto: \"{relevant_doc}\"\n\nPergunta: {query}")
 
-            # Extrai conteúdo adicional da página
-            print(f"Extraindo conteúdo de: {title}")
-            conteudo = extrair_conteudo_pagina(link)
-
-            results.append({
-                'title': title,
-                'link': link,
-                'snippet': snippet,
-                'conteudo': conteudo
-            })
-
-            # Pequena pausa para evitar sobrecarga
-            time.sleep(1)
-
-    return results
-
-def mostrar_resultados(resultados):
-    print("\nResultados encontrados:\n")
-    print("-" * 80)
-    for i, r in enumerate(resultados, 1):
-        print(f"\n{i}. {r['title']}")
-        print(f"\nLink: {r['link']}")
-        print(f"\nResumo: {r['snippet']}")
-        print(f"\nConteúdo extraído: {r['conteudo'][:500]}...")  # Mostra os primeiros 500 caracteres
-        print("\n" + "-" * 80)
-
-# Interface para o usuário
-query = input("Digite o que você quer pesquisar: ")
-print("\nBuscando resultados... Por favor, aguarde.")
-
-resultados = buscar_duckduckgo(query)
-mostrar_resultados(resultados)
+# 8. Mostrar resultado
+print("Pergunta:", query)
+print("Documento usado:", relevant_doc)
+print("Resposta:", response.text)

@@ -52,12 +52,12 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
         try:  
             shortcode = content["shortcode"]
             if is_shared_reel or "type" in content and content["type"] == "video":
+                print(instaloader.Post.mediaid_to_shortcode(int(shortcode)))
                 response = requests.get(content["file_src"], stream=True)
                 filename = None
                 if content["type"] == "video":
                     filename = f"{self.temp_path}/v_{str(shortcode)}.mp4"
                 else:
-                    post = instaloader.Post.from_mediaid(self.L.context, content["shortcode"])
                     filename = f"{self.temp_path}/v_{str(shortcode)}.jpg"
                 with open(filename, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
@@ -132,6 +132,8 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                     content["is_link_shared_reel"] = False
                     content["is_shared_reel"] = False
                     content["shortcode"] = self.get_shortcode_from_url(content["text"])
+
+            self.send_message_to_user(instagram_account_id, sender_id, "Estamos analisando o conteúdo. Pode demorar alguns segundos...")
             if "is_media" in content:
                 caption = content["caption"] if "caption" in content else ""
                 content_data, content_type = self.process_content(content)
@@ -140,29 +142,23 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                 filename = content_data
 
                 if content_type == "video":
-                    prompt_content1=[
-                        f"Legenda: \"{caption}\". Faça a análise do conteúdo desse video, e, para analisar se é fake news ou não, me diga exatamente 'Sim' caso precise de fontes da web pra melhor resultado e não caso contrário. Após essa resposta, me diga exatamente separado por linhas, o que precisa ser pesquisado.",
-                        file
-                    ]
-                    prompt_content2=[
-                        f"Legenda: \"{caption}\". Faça a análise do conteúdo desse vídeo, tanto informações visuais (analizando a veracidade dos conteúdos mostrados) quanto audio, também a legenda fornecida. Primeiramente, me diga: 'É fake news' ou 'Não é fake news'. Depois diga os motivos, podendo realizar uma pesquisa sobre o assunto. OBS: Responda com no máximo 1000 (mil) caracteres.",
-                        file
-                    ]
-
                     prompt1 = [
-                        f"Video: \"{text}\"\n. Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
+                        f"Legenda: \"{caption}\". Analise o video detalhadamente e sua legenda. Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
                         file
                     ]
                     response_text = self.get_text_from_prompt(self.client.models.generate_content(
-                        model="gemini-2.0-flash",
+                        model=self.model,
                         contents=prompt1,
                     ))
 
                     response_text = self.get_text_from_prompt(
                         self.client.models.generate_content(
-                            model="gemini-2.0-flash",
-                            contents= f"""Com base na mensagem: "{text}", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si.
-                                """,
+                            model=self.model,
+                            contents=[
+                                    f"""Legenda: \"{caption}\". Com base no video e na legenda apresentada, pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si.
+                                    """,
+                                    file
+                                ],
                                 config=GenerateContentConfig(
                                 tools=[self.google_search_tool],
                                 response_modalities=["TEXT"],
@@ -172,32 +168,30 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
 
                     # print(response_text)
                     response_text = self.get_text_from_prompt(self.client.models.generate_content(
-                        model="gemini-2.0-flash",
-                        contents=f"Analise a mensagem \"{text}\". Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                        model=self.model,
+                        contents=[
+                            f"Legenda: \"{caption}\". Analise o video detalhadamente e a legenda, depois analise a veracidade deles com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                        ]
                     ))
+                    os.remove(filename)
                     self.send_message_to_user(instagram_account_id, sender_id, response_text)
                     return None
 
                 else:
-                    prompt_content1=[
-                        f"Faça a análise detalhadamente do conteúdo presente nessa imagem, e, para analisar se é fake news ou não, me diga exatamente 'Sim' caso precise de fontes da web pra melhor resultado e não caso contrário. Após essa resposta, me diga exatamente separado por linhas, o que precisa ser pesquisado.",
-                        file
-                    ]
-
                     prompt1 = [
                         f"Faça a análise detalhadamente do conteúdo presente nessa imagem, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
                         file
                     ]
                     response_text = self.get_text_from_prompt(self.client.models.generate_content(
-                        model="gemini-2.0-flash",
+                        model=self.model,
                         contents=prompt1,
                     ))
 
-                    response_text = self.get_text_from_prompt(
+                    response_text2 = self.get_text_from_prompt(
                         self.client.models.generate_content(
-                            model="gemini-2.0-flash",
+                            model=self.model,
                             contents=[
-                                f"""Com base no conteúdo da imagem", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes.
+                                f"""Com base no conteúdo da imagem, pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes.
                                 """,
                                 file
                             ],
@@ -210,14 +204,16 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
 
                     # print(response_text)
                     response_text = self.get_text_from_prompt(self.client.models.generate_content(
-                        model="gemini-2.0-flash",
+                        model=self.model,
                         contents=[
-                            f"Analise detalhadamente o conteúdo presente na imagem. Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                            f"Analise detalhadamente o conteúdo presente na imagem. Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text2}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
                             file
                         ]
                     ))
-                    self.send_message_to_user(instagram_account_id, sender_id, response_text)
+                    os.remove(filename)
+                    self.send_message_to_user(instagram_account_id, sender_id, response_text + response_text2)
                     return None
+                
 
             else:
                 text = content["text"]
@@ -226,13 +222,13 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                     f"Analise a mensagem: \"{text}\"\n. Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi"
                 ]
                 response_text = self.get_text_from_prompt(self.client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model=self.model,
                     contents=prompt1,
                 ))
 
                 response_text = self.get_text_from_prompt(
                     self.client.models.generate_content(
-                        model="gemini-2.0-flash",
+                        model=self.model,
                         contents= f"""Com base na mensagem: "{text}", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si.
                             """,
                             config=GenerateContentConfig(
@@ -244,12 +240,11 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
 
                 # print(response_text)
                 response_text = self.get_text_from_prompt(self.client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model=self.model,
                     contents=f"Analise a mensagem \"{text}\". Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
                 ))
                 self.send_message_to_user(instagram_account_id, sender_id, response_text)
                 return None
-            
             response = self.client.models.generate_content(
                 model="gemini-2.0-flash",
                 contents = prompt_content1,
