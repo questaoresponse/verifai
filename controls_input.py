@@ -170,7 +170,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                     response_text = self.get_text_from_prompt(self.client.models.generate_content(
                         model=self.model,
                         contents=[
-                            f"Legenda: \"{caption}\". Analise o video detalhadamente e a legenda, depois analise a veracidade deles com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                            f"Legenda: \"{caption}\". Analise o video detalhadamente e a legenda, depois analise a veracidade deles com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga '✅ É fato' ou '❌ É fake' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres.",
                         ]
                     ))
                     os.remove(filename)
@@ -179,7 +179,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
 
                 else:
                     prompt1 = [
-                        f"Faça a análise detalhadamente do conteúdo presente nessa imagem, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
+                        f"Transforme o conteúdo dessa imagem para uma pesquisa da web com o intuito de verificar a veracidade. Me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi.",
                         file
                     ]
                     response_text = self.get_text_from_prompt(self.client.models.generate_content(
@@ -191,7 +191,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                         self.client.models.generate_content(
                             model=self.model,
                             contents=[
-                                f"""Com base no conteúdo da imagem, pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes.
+                                f"""Com base no conteúdo da imagem, pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da imagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. OBS: Responda com menos de 1000 caracteres.
                                 """,
                                 file
                             ],
@@ -206,7 +206,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                     response_text = self.get_text_from_prompt(self.client.models.generate_content(
                         model=self.model,
                         contents=[
-                            f"Analise detalhadamente o conteúdo presente na imagem. Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text2}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                            f"Analise detalhadamente o conteúdo presente na imagem. Analise a veracidade da imagem com os seguintes resultados de pesquisa: \"{response_text2}\". Agora, diga ''✅ É fato' ou '❌ É fake' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
                             file
                         ]
                     ))
@@ -241,7 +241,7 @@ class ControlsInput(VideoAnalyzer, ImageAnalyzer, InternetAnalyzer):
                 # print(response_text)
                 response_text = self.get_text_from_prompt(self.client.models.generate_content(
                     model=self.model,
-                    contents=f"Analise a mensagem \"{text}\". Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga 'É fake news' ou 'Não é fake news' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
+                    contents=f"Analise a mensagem \"{text}\". Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga '✅ É fato' ou '❌ É fake' no começo da resposta, depois os motivos. Diga se não é fake news apenas se todos os dados condizerem com as pesquisas. OBS: Responda com menos de 1000 caracteres",
                 ))
                 self.send_message_to_user(instagram_account_id, sender_id, response_text)
                 return None
