@@ -1,0 +1,23 @@
+#table{
+    width: 100%;
+    height: 100%
+}
+#head, .line{
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 32px;
+}
+#head > div, .line > div{
+    width: 20%;
+    padding-left: 2px;
+    padding-right: 2px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+}
+.line .line-link{
+    display: block;
+}

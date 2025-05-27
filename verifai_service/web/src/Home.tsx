@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
-import './App.css'
+import './Home.css'
 
 interface line{
   id: number,
@@ -13,20 +13,22 @@ function Home() {
   const [ lines, setLines ] = useState<line[]>([]);
 
   useEffect(()=>{
-    setLines([{id:1,link:"https://",type:0,expect:1,result:1}]);
+    fetch("http://127.0.0.1:12345/list").then(response=>response.json()).then(response=>{
+      setLines(response.data);
+    })
   },[]);
 
   return (
-    <div id="page">
-        <div className='table'>
-            <div className='head'>
+    <div id="home">
+        <div id='table'>
+            <div id='head'>
                 <div className="line-id">Id</div>
                 <div className="line-link">Link</div>
                 <div className="line-expect">Expectativa</div>
                 <div className="line-type">Tipo</div>
                 <div className="line-result">Resultado</div>
             </div>
-            <div className="content">{lines.map((line)=>{
+            <div id="content">{lines.map((line)=>{
                 return <div className='line'>
                     <div className="line-id">{line.id}</div>
                     <div className="line-link">{line.link}</div>

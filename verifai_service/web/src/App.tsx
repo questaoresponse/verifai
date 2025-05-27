@@ -13,11 +13,13 @@ interface line{
 }
 
 function App() {
-  const [ currentPage, setCurrentPage ] = useState("Home")
+  const [ currentPage, setCurrentPage ] = useState("Home");
 
   return <>
-    <Header></Header> 
-    { currentPage == "Home" ? <Home></Home> : <Insert setCurrentPage={setCurrentPage}></Insert> }
+    <Header currentPage={currentPage} setCurrentPage={setCurrentPage}></Header>
+    <div id="page">
+      { currentPage == "Home" ? <Home></Home> : <Insert setCurrentPage={setCurrentPage}></Insert> }
+    </div>
   </>
 }
 
