@@ -1,26 +1,18 @@
-import { useEffect, useState } from 'react'
-import Header from './Header'
+import { BrowserRouter as Router, Routes, Route } from 'react-router';
 import Home from './Home'
 import Insert from './Insert'
 import './App.css'
 
-interface line{
-  id: number,
-  link:string,
-  type: number,
-  expect: number,
-  result: number
-}
-
 function App() {
-  const [ currentPage, setCurrentPage ] = useState("Home");
 
-  return <>
-    <Header currentPage={currentPage} setCurrentPage={setCurrentPage}></Header>
-    <div id="page">
-      { currentPage == "Home" ? <Home></Home> : <Insert setCurrentPage={setCurrentPage}></Insert> }
-    </div>
-  </>
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home/>} />
+        <Route path="/insert" element={<Insert/>} />
+      </Routes>
+    </Router>
+  )
 }
 
-export default App
+export default App;

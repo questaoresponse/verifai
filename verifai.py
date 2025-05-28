@@ -39,6 +39,7 @@ class Verifai:
         self.DEBUG = os.getenv("DEBUG")
         self.API_KEY = os.getenv('GOOGLE_API_KEY')
         self.CSE_ID = os.getenv('GOOGLE_CSE_ID')
+        self.VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
         self.client = genai.Client(api_key=self.API_KEY_GEMINI)
 

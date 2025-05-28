@@ -1,7 +1,10 @@
-import { useRef, type Dispatch, type SetStateAction } from 'react'
-import "./Insert.css"
+import { useRef } from 'react';
+import { useNavigate } from "react-router-dom";
+import "./Insert.css";
+import Header from './Header';
 
-function Insert({setCurrentPage}:{setCurrentPage: Dispatch<SetStateAction<string>>}){
+function Insert(){
+    const navigate = useNavigate();
     const refs = {
         link: useRef<HTMLInputElement>(null),
         type: useRef<HTMLSelectElement>(null),
@@ -22,27 +25,41 @@ function Insert({setCurrentPage}:{setCurrentPage: Dispatch<SetStateAction<string
             },
             body: JSON.stringify({ link, type, expect })
         }).then(response=>response.json()).then(response=>{
-            response.result=="true" && setCurrentPage("Home");
+            response.result=="true" && navigate("/");
         })
     }
 
-    return <div id="insert">
-        <input ref={refs.link} id="link"></input>
-        <select defaultValue="1" ref={refs.type} id="type">
-            <option value="1">Esporte</option>
-            <option value="2">Cultura</option>
-            <option value="3">Ciencia</option>
-            <option value="4">Politica</option>
-            <option value="5">História</option>
-            <option value="6">Geografia</option>
-            <option value="0">Outra</option>
-        </select>
-        <select defaultValue="1" ref={refs.expect} id="expect">
-            <option value="1">Verdadeiro</option>
-            <option value="0">Falso</option>
-        </select>
-        <div id="send" className='btn' onClick={verifyInsert}>Inserir</div>
-    </div>
+    return <>
+        <Header></Header>
+        <div id="insert" className='page'>
+            <div id="form">
+                <div className='group'>
+                    <div className='label'>Link:</div>
+                    <input ref={refs.link} id="link" className='group-input'></input>
+                </div>
+                <div className='group'>
+                    <div className='label'>Tipo de conteúdo:</div>
+                    <select className='insert-select group-input' defaultValue="1" ref={refs.type} id="type">
+                        <option value="1">Esporte</option>
+                        <option value="2">Cultura</option>
+                        <option value="3">Ciência</option>
+                        <option value="4">Política</option>
+                        <option value="5">História</option>
+                        <option value="6">Geografia</option>
+                        <option value="0">Outro</option>
+                    </select>
+                </div>
+                <div className='group'>
+                    <div className='label'>Veracidade:</div>
+                    <select className='insert-select group-input' defaultValue="1" ref={refs.expect} id="expect">
+                        <option value="1">Verdadeiro</option>
+                        <option value="0">Falso</option>
+                    </select>
+                </div>
+                <div id="send" className='btn' onClick={verifyInsert}>Inserir</div>
+            </div>
+        </div>
+    </>
 }
 
 export default Insert

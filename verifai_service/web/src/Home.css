@@ -1,6 +1,7 @@
-#table{
+#home{
     width: 100%;
-    height: 100%
+    height: 100%;
+    max-width: 800px;
 }
 #head, .line{
     display: flex;
@@ -9,7 +10,7 @@
     height: 32px;
 }
 #head > div, .line > div{
-    width: 20%;
+    width: 100px;
     padding-left: 2px;
     padding-right: 2px;
     text-overflow: ellipsis;
@@ -18,6 +19,24 @@
     display: flex;
     justify-content: center;
 }
+.line-link{
+    width: calc(100% - 400px) !important;
+}
+.line-link-text{
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
 .line .line-link{
     display: block;
+    color: blue;
+    text-decoration: underline;
+}
+#home .execute-group{
+    width: fit-content;
+    display: flex;
+    justify-content: center;
+}
+#home .label{
+    margin-right: 5px;
 }

@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS links (
     link VARCHAR(100),
     type INT,
     expect INT,
-    result INT
+    result INT,
+    response VARCHAR(1000)
 )
 """)
 
@@ -41,7 +42,6 @@ CORS(app)
 def list():
     cursor.execute("SELECT * FROM links")
     rows = cursor.fetchall()
-    print(rows)
     return json.dumps({ "result": "true", "data": rows }), 200
 
 @app.route("/insert", methods=["POST"])
@@ -51,7 +51,7 @@ def insert():
         link = data["link"]
         tipo = int(data["type"])
         expect = int(data["expect"])
-        cursor.execute("INSERT INTO links (link, type, expect, result) VALUES (%s, %s, %s, %s)", (link, tipo, expect, 2))
+        cursor.execute("INSERT INTO links (link, type, expect, result, response) VALUES (%s, %s, %s, %s, %s)", (link, tipo, expect, 2, ""))
         conn.commit()
         return json.dumps({ "result": "true" }), 200
     except Exception as e:
@@ -63,7 +63,7 @@ def delete():
     data = request.get_json()
     id = int(data["id"])
     cursor.execute("DELETE FROM links WHERE id = %s", (id))
-    cursor.commit()
+    conn.commit()
     return list()
 
 @app.route("/verify", methods=["POST"])
@@ -71,24 +71,25 @@ def verify():
     data = request.get_json()
     id_start = data["id_start"]
     id_end = data["id_end"]
-    cursor.execute("SELECT * FROM links WHERE id > %s AND id < %s", (id_start, id_end))
+    cursor.execute("SELECT * FROM links WHERE id >= %s AND id <= %s", (id_start, id_end))
     rows = cursor.fetchall()
 
-    headers = {
-        "VERIFY_TOKEN": os.getenv("VERIFY_TOKEN")
+    data = {
+        "VERIFY_TOKEN": os.getenv("VERIFY_TOKEN"),
     }
 
-    results = {}
-
     for row in rows:
-        response = requests.post("http://127.0.0.1:5000", headers=headers).json()
-        verify_result = 0 if "não" in response["data"][:10] else 1
-        results[str(row["id"])] = verify_result
+        data["link"] = row["link"]
 
-        cursor.execute("UPDATE links SET result = %s WHERE id = %s", (int(row["id"]), verify_result))
-        cursor.commit()
+        response = requests.post("http://127.0.0.1:5000/verify", json=data).json()
 
-    return json.dumps({ "result": "true", "results": results }), 200
+        verify_result = 1 if "fato" in response["response"][:10] else 0
+        response[str(row["id"])] = { "result": verify_result, "response": response["response"] }
+
+        cursor.execute("UPDATE links SET result = %s, response = %s WHERE id = %s", (verify_result, response["response"], int(row["id"])))
+        conn.commit()
+
+    return list()
 
 if __name__ == "__main__":
     app.run("0.0.0.0", 12345)

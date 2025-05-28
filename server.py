@@ -1,15 +1,18 @@
-from flask import Flask
+from flask import Flask, request
+from flask_cors import CORS
 import requests
 import os
 import socketio
 import threading
 from verifai import Verifai
 from controls_input import ControlsInput
+from verify_links import VerifyLinks
 
-class Server(ControlsInput):
+class Server(ControlsInput, VerifyLinks):
     def __init__(self):
         Verifai.__init__(self)
         ControlsInput.__init__(self)
+        VerifyLinks.__init__(self)
 
         if os.path.isfile(f"{os.getcwd()}/session/{self.username}"):
             self.L.load_session_from_file(self.username, filename=f"{os.getcwd()}/session/{self.username}")  # se já tiver salvo antes
@@ -18,6 +21,8 @@ class Server(ControlsInput):
             self.L.save_session_to_file(filename=f"{os.getcwd()}/session/{self.username}")
 
         self.app = Flask(__name__)
+
+        CORS(self.app)
 
         self.io = socketio.Client()
 
@@ -41,14 +46,17 @@ class Server(ControlsInput):
         self.io.on("webhook", self.webhook_socketio)
 
         self.app.add_url_rule('/webhook', view_func=self.webhook_flask)
+        self.app.add_url_rule('/verify', view_func=self.verify_flask, methods=["POST"])
 
     #13c704a8b51257b55615159eeb5dc4e8
 
     def webhook_socketio(self, data):
-        self.analyze(data)
+        self.process_webhook_message(data)
 
-    def webhook_flask(self, data):
-        self.analyze(data.get_json())
+    def webhook_flask(self):
+        self.process_webhook_message(request.get_json())
+
+        return "", 200
 
     def send_requests(self):
         try:
