@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import "./Insert.css";
 import Header from './Header';
 
+const SERVER = import.meta.env.DEV ? "http://127.0.0.1:12345" : "";
+
 function Insert(){
     const navigate = useNavigate();
     const refs = {
@@ -18,7 +20,7 @@ function Insert(){
 
         if (!(link.startsWith("https://www.instagram.com/p/") || link.startsWith("https://www.instagram.com/reel/") || link.startsWith("https://www.instagram.com/share/p/") || link.startsWith("https://wwww.instagram.com/share/reel/"))) return;
 
-        fetch("http://127.0.0.1:12345/insert", {
+        fetch(SERVER + "/insert", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
