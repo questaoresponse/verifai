@@ -19,7 +19,7 @@ function Home() {
     const [ executeValue, setExecuteValue ] = useState("");
     const [ isValidExecuteValue, setIsValidExecuteValue ] = useState(true);
     const [ result, setResult ] = useState({ recall: 0, precision: 0, specificity: 0, accuracy: 0 });
-    const [ response, setResponse ] = useState([false,""]);
+    const [ response, _ ] = useState([false,""]);
 
     const transformData = (data: any) => {
         const types = [
@@ -107,7 +107,7 @@ function Home() {
         });
     }
     
-    const switchResponse = (line: line) => {
+    const switchResponse = (_: line) => {
         
     }
 
