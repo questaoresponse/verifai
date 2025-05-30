@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, send_file, send_from_directory
 import json
 import pymysql
 import requests
@@ -35,8 +35,16 @@ CREATE TABLE IF NOT EXISTS links (
 )
 """)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
 CORS(app)
+
+@app.route('/<path:filename>')
+def arquivos_estaticos(filename):
+    return send_from_directory('dist', filename)
+
+@app.route("/", methods=["GET"])
+def home():
+    return send_file("dist/index.html")
 
 @app.route("/list", methods=["GET"])
 def list():
@@ -44,8 +52,11 @@ def list():
     rows = cursor.fetchall()
     return json.dumps({ "result": "true", "data": rows }), 200
 
-@app.route("/insert", methods=["POST"])
+@app.route("/insert", methods=["GET","POST"])
 def insert():
+    if request.method == "GET":
+        return send_file("dist/index.html")
+
     try: 
         data = request.get_json()
         link = data["link"]
@@ -82,7 +93,6 @@ def verify():
         data["link"] = row["link"]
 
         response = requests.post("http://127.0.0.1:5000/verify", json=data).json()
-
         verify_result = 1 if "fato" in response["response"][:10] else 0
         response[str(row["id"])] = { "result": verify_result, "response": response["response"] }
 
