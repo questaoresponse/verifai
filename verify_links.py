@@ -13,6 +13,6 @@ class VerifyLinks():
         link = data["link"]
 
         content = self.get_content_object({}, link)
-        response_text = self.process_post(content)
+        response_text = self.get_result_from_process(content)
 
         return json.dumps({ "response": response_text }), 200

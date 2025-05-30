@@ -54,7 +54,8 @@ response = client.models.generate_content(
 )
 
 # for each in response.candidates[0].content.parts:
-print(response.candidates[0].content.parts[0].text)
+for chunk in response.candidates[0].grounding_metadata.grounding_chunks:
+    print(chunk.web.uri)
 # Example response:
 # The next total solar eclipse visible in the contiguous United States will be on ...
 
