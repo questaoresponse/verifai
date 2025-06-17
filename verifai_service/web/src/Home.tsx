@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './Home.css'
 import Header from './Header';
+import { useNavigate } from 'react-router-dom';
 
 const SERVER = import.meta.env.DEV ? "http://127.0.0.1:12345" : "";
 
@@ -15,6 +16,8 @@ interface line {
 }
 
 function Home() {
+    const navigate = useNavigate();
+
     const [ lines, setLines ] = useState<line[]>([]);
     const [ executeValue, setExecuteValue ] = useState("");
     const [ isValidExecuteValue, setIsValidExecuteValue ] = useState(true);
@@ -138,6 +141,10 @@ function Home() {
 
     },[lines]);
 
+    const editLine = (line: line) => {
+        navigate("/edit?id=" + line.id);
+    }
+
     return <>
         <Header></Header>
         <div id="home" className='page'>
@@ -160,8 +167,9 @@ function Home() {
                         <div className="line-type">{line.processedType}</div>
                         <div className="line-result">{line.result}</div>
                         <div className="line-options">
-                            <div className='delete-option' onClick={()=>deleteLine(line.id)}>del</div>
-                            <div className="complete-option" onClick={()=>switchResponse(line)}>comp</div>
+                            <div className='delete-option btn-option' onClick={()=>deleteLine(line.id)}>del</div>
+                            <div className="edit-option btn-option" onClick={()=>editLine(line)}>edit</div>
+                            <div className="complete-option btn-option" onClick={()=>switchResponse(line)}>comp</div>
                         </div>
                     </div>
                 })}</div>

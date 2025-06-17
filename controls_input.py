@@ -67,7 +67,7 @@ class ControlsInput():
                 if content["type"] == "video":
                     return [ filename, "video" ]
                 else:
-                    return [ filename, "imagem" ]
+                    return [ filename, "image" ]
                 
             else:               
                 self.L.download_post(content["post"], target="verifica_ai_temp")
@@ -76,7 +76,8 @@ class ControlsInput():
                     filename = f"{self.temp_path}/vl_{shortcode}.mp4"
                     return [ filename, "video" ]
                 else:
-                    return [ filename, "imagem" ]
+                    filename = f"{self.temp_path}/vl_{shortcode}.jpg"
+                    return [ filename, "image" ]
 
         except Exception as e:
             print(e)
@@ -185,7 +186,6 @@ OBS: Responda com menos de 1000 caracteres""",
             ])
 
             self.client.files.delete(name = file.name)
-
             return response_text
     
         elif type == "text":
@@ -321,6 +321,7 @@ OBS: Responda com menos de 1000 caracteres"""
             self.send_message_to_user(instagram_account_id, sender_id, "Link inválido. Verifique-o e tente novamente.")
             return
         response_text = self.get_result_from_process(content)
+
         self.send_message_to_user(instagram_account_id, sender_id, response_text)
 
     # Fornece os dados necessários para serem passados para o prompt

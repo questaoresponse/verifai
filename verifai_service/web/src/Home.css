@@ -40,3 +40,22 @@
 #home .label{
     margin-right: 5px;
 }
+
+#home .btn-option{
+    display: block;
+    width: fit-content;
+    height: fit-content;
+    background-color: black;
+    color: white;
+    border-radius: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+    margin-left: 2px;
+    font-size: 95%;
+    cursor: pointer;
+    pointer-events: none;
+}
+
+#home .btn-option:nth-child(1){
+    margin-left: 0;
+}

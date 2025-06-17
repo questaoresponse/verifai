@@ -52,6 +52,27 @@ def list():
     rows = cursor.fetchall()
     return json.dumps({ "result": "true", "data": rows }), 200
 
+@app.get("/edit", methods=["GET", "POST"])
+def edit():
+    if request.method == "GET":
+        return send_file("../web/dist/index.html")
+    
+    try:
+        data = request.get_json()
+        id = data["id"]
+        if (data["type"] == "get"):
+            cursor.execute("SELECT * FROM links WHERE id=%s", (id))
+            rows = cursor.fetchall()
+            return json.dumps({ "result": "true", "data": rows }), 200
+        else:
+            expect = data["expect"]
+            cursor.execute("UPDATE links SET expect=%s WHERE id=%s", (expect, id))
+            conn.commit()
+            return json.dumps({ "results": "true"})
+    except Exception as e:
+        print(e)
+        return json.dumps({ "result": "false" }), 200
+
 @app.route("/insert", methods=["GET", "POST"])
 def insert():
     if request.method == "GET":

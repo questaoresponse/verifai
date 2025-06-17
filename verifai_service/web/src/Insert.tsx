@@ -1,17 +1,30 @@
-import { useRef } from 'react';
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from "react-router-dom";
 import "./Insert.css";
 import Header from './Header';
 
 const SERVER = import.meta.env.DEV ? "http://127.0.0.1:12345" : "";
 
+interface line {
+  id: number,
+  link:string,
+  type: number,
+  processedType: string,
+  expect: number,
+  result: string,
+  response: string
+}
+
 function Insert(){
     const navigate = useNavigate();
+    const location = useLocation();
+
     const refs = {
         link: useRef<HTMLInputElement>(null),
         type: useRef<HTMLSelectElement>(null),
         expect: useRef<HTMLSelectElement>(null)
     }
+    const [ editLine, setEditLine ] = useState<line | null>(null);
 
     const verifyInsert = ()=>{
         const link = refs.link.current!.value;
@@ -30,6 +43,20 @@ function Insert(){
             response.result=="true" && navigate("/");
         })
     }
+
+    useEffect(()=>{
+        if (location.pathname == "/edit"){
+            fetch(SERVER + "/edit", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ type: "get" })
+            }).then(response=>response.json()).then(response=>{
+                response.result=="true" && navigate("/");
+            });
+        }
+    },[]);
 
     return <>
         <Header></Header>
