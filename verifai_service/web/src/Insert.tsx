@@ -27,21 +27,39 @@ function Insert(){
     const [ editLine, setEditLine ] = useState<line | null>(null);
 
     const verifyInsert = ()=>{
-        const link = refs.link.current!.value;
-        const type = refs.type.current!.value;
-        const expect = refs.expect.current!.value;
+        if (editLine){
+            const link = editLine.link;
+            const type = editLine.type;
+            const expect = refs.expect.current!.value;
 
-        if (!(link.startsWith("https://www.instagram.com/p/") || link.startsWith("https://www.instagram.com/reel/") || link.startsWith("https://www.instagram.com/share/p/") || link.startsWith("https://wwww.instagram.com/share/reel/"))) return;
+            if (!(link.startsWith("https://www.instagram.com/p/") || link.startsWith("https://www.instagram.com/reel/") || link.startsWith("https://www.instagram.com/share/p/") || link.startsWith("https://wwww.instagram.com/share/reel/"))) return;
+            
+            fetch(SERVER + "/insert", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ link, type, expect })
+            }).then(response=>response.json()).then(response=>{
+                response.result=="true" && navigate("/");
+            })
+        } else {
+            const link = refs.link.current!.value;
+            const type = refs.type.current!.value;
+            const expect = refs.expect.current!.value;
 
-        fetch(SERVER + "/insert", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ link, type, expect })
-        }).then(response=>response.json()).then(response=>{
-            response.result=="true" && navigate("/");
-        })
+            if (!(link.startsWith("https://www.instagram.com/p/") || link.startsWith("https://www.instagram.com/reel/") || link.startsWith("https://www.instagram.com/share/p/") || link.startsWith("https://wwww.instagram.com/share/reel/"))) return;
+            
+            fetch(SERVER + "/insert", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ link, type, expect })
+            }).then(response=>response.json()).then(response=>{
+                response.result=="true" && navigate("/");
+            })
+        }
     }
 
     useEffect(()=>{

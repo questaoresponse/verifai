@@ -156,9 +156,10 @@ OBS: Responda com menos de 1000 caracteres.""",
 
             self.client.files.delete(name = file.name)
 
+
             return f"{response_text}\n{fonts}"
     
-        elif type == "image":
+        elif type == "image":                                                                  
             response_text = self.generate_response([
                 f"Transforme o conteúdo dessa imagem para uma pesquisa da web com o intuito de verificar a veracidade. Me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi.",
                 file
