@@ -9,6 +9,7 @@ from google.genai.types import GenerateContentConfig
 
 load_dotenv()
 
+posts = {}
 
 class ControlsInput():
     def __init__(self):
@@ -93,12 +94,12 @@ class ControlsInput():
         headers = {
             "Authorization": f"Bearer {self.PAGE_ACCESS_TOKEN}"
         }
-        requests.post(url, headers=headers, json=payload).json()
+        v = requests.post(url, headers=headers, json=payload).json()
 
     # Executa os prompts e retorna o resultado
     def generate_response(self, prompt, use_google_search = False):
         if use_google_search:
-            return self.get_text_from_prompt(
+            response = self.get_text_from_prompt(
                 self.client.models.generate_content(
                     model=self.model,
                     contents=prompt,
@@ -108,83 +109,156 @@ class ControlsInput():
                     )
                 )
             )
+            return [  response, "" ] if (isinstance(response, str)) else response
 
-        return self.get_text_from_prompt(self.client.models.generate_content(
+        response = self.get_text_from_prompt(self.client.models.generate_content(
                 model=self.model,
                 contents=prompt
         ))
+        return [  response, "" ] if (isinstance(response, str)) else response
+    
+    def get_uploaded_file(self, content):
+            filename = content["filename"]
+            file = self.upload_file(filename)
+            os.remove(filename)
+
+            return file
 
     # Retorna a resposta processada da GEMINI API, fornecendo os prompts necessários para cada tipo de postagem
     def get_response_from_type(self, type, content):
         is_media = type == "video" or type == "image"
 
-        file = None
+        object_if_is_old_message = content["object_if_is_old_message"] if "object_if_is_old_message" in content else None
+        file = self.get_uploaded_file(content) if is_media else None
 
-        if is_media:
-            filename = content["filename"]
-            file = self.upload_file(filename)
-            os.remove(filename)
-
+        
         if type == "video":
             caption = content["caption"]
 
-            response_text = self.generate_response([
-                f"Legenda: \"{caption}\". Analise o video detalhadamente e sua legenda. Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
-                file
-            ])
+            if object_if_is_old_message:
+                text = object_if_is_old_message["text"]
 
-            response_text, fonts = self.generate_response([
-                f"""Legenda: \"{caption}\". Com base no video e na legenda apresentada, pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si.
-                """,
-                file
-            ], True)
+                response_text,_ = self.generate_response([
+                    f"Legenda: \"{caption}\". Analise o video detalhadamente e sua legenda com base no texto \"{text}\". Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
+                    file
+                ])
 
-            response_text = self.generate_response([
-                f"""Legenda: \"{caption}\". Analise o video detalhadamente e a legenda, depois analise a veracidade deles com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga '✅ É fato' ou '❌ É fake' no começo da resposta. Diga que é fato apenas se todos os dados condizerem com as pesquisas, principalmente os temporais. 
-Se for fake news, com base nas definições a seguir, classifique o tipo de desinformação representado. As categorias são:
-Sátira ou paródia: Não têm a intenção de causar danos, mas podem enganar. Embora sejam formas legítimas de expressão artística, podem ser confundidas com fatos reais em ambientes digitais onde as informações circulam rapidamente.
-Conexão falsa: Ocorre quando títulos, imagens ou legendas não têm relação com o conteúdo da matéria. Essa prática visa atrair cliques e engajamento, mas engana o leitor ao apresentar informações desconectadas.
-Conteúdo enganoso: Uso distorcido de informações verdadeiras para manipular a interpretação dos fatos. Pode envolver a seleção parcial de dados, estatísticas ou citações, bem como o uso de imagens de forma a induzir a erro.
-Contexto falso: Informações verdadeiras são retiradas de seu contexto original e reapresentadas de maneira enganosa.
-Conteúdo impostor: Ocorre quando alguém se passa por uma fonte confiável (instituições, veículos de imprensa ou pessoas públicas) para dar credibilidade a informações falsas.
-Conteúdo manipulado: Conteúdo genuíno (como vídeos, imagens ou documentos) é alterado de forma intencional para enganar.
-Conteúdo fabricado: Todo o conteúdo é falso, criado do zero. Pode ser textual, visual ou multimodal. Para analisar esse tipo de conteúdo, é útil considerar os elementos da desordem informacional: o agente (quem cria, produz ou distribui), a mensagem e os intérpretes. É essencial entender as motivações dos envolvidos e os tipos de mensagens disseminadas.
-Deixe a classificação clara. Na linha debaixo, justifique sua resposta para tal classificação com base nos dados apresentados.
-OBS: Responda com menos de 1000 caracteres.""",
-                file
-            ])
+                t = self.generate_response([
+                    f"""Legenda: \"{caption}\". Analisando o video e a legenda com base no texto \"{text}\", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si.
+                    """,
+                    file
+                ], True)
+
+                response_text, fonts = t
+
+                response_text,_ = self.generate_response([
+                    f"""Legenda: \"{caption}\". Com base no texto \"{text}\", analise o video detalhadamente e a legenda, depois analise a veracidade deles com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga '✅ É fato' ou '❌ É fake' no começo da resposta. Diga que é fato apenas se todos os dados condizerem com as pesquisas, principalmente os temporais. 
+    Se for fake news, com base nas definições a seguir, classifique o tipo de desinformação representado. As categorias são:
+    Sátira ou paródia: Não têm a intenção de causar danos, mas podem enganar. Embora sejam formas legítimas de expressão artística, podem ser confundidas com fatos reais em ambientes digitais onde as informações circulam rapidamente.
+    Conexão falsa: Ocorre quando títulos, imagens ou legendas não têm relação com o conteúdo da matéria. Essa prática visa atrair cliques e engajamento, mas engana o leitor ao apresentar informações desconectadas.
+    Conteúdo enganoso: Uso distorcido de informações verdadeiras para manipular a interpretação dos fatos. Pode envolver a seleção parcial de dados, estatísticas ou citações, bem como o uso de imagens de forma a induzir a erro.
+    Contexto falso: Informações verdadeiras são retiradas de seu contexto original e reapresentadas de maneira enganosa.
+    Conteúdo impostor: Ocorre quando alguém se passa por uma fonte confiável (instituições, veículos de imprensa ou pessoas públicas) para dar credibilidade a informações falsas.
+    Conteúdo manipulado: Conteúdo genuíno (como vídeos, imagens ou documentos) é alterado de forma intencional para enganar.
+    Conteúdo fabricado: Todo o conteúdo é falso, criado do zero. Pode ser textual, visual ou multimodal. Para analisar esse tipo de conteúdo, é útil considerar os elementos da desordem informacional: o agente (quem cria, produz ou distribui), a mensagem e os intérpretes. É essencial entender as motivações dos envolvidos e os tipos de mensagens disseminadas.
+    Deixe a classificação clara. Na linha debaixo, justifique sua resposta para tal classificação com base nos dados apresentados.
+    OBS: Responda com menos de 850 caracteres.""",
+                    file
+                ])
+        
+            else:
+                response_text,_ = self.generate_response([
+                    f"Legenda: \"{caption}\". Analise o video detalhadamente e sua legenda. Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi",
+                    file
+                ])
+
+                t = self.generate_response([
+                    f"""Legenda: \"{caption}\". Com base no video e na legenda apresentada, pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si.
+                    """,
+                    file
+                ], True)
+
+                response_text, fonts = t
+
+                response_text,_ = self.generate_response([
+                    f"""Legenda: \"{caption}\". Analise o video detalhadamente e a legenda, depois analise a veracidade deles com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga '✅ É fato' ou '❌ É fake' no começo da resposta. Diga que é fato apenas se todos os dados condizerem com as pesquisas, principalmente os temporais. 
+    Se for fake news, com base nas definições a seguir, classifique o tipo de desinformação representado. As categorias são:
+    Sátira ou paródia: Não têm a intenção de causar danos, mas podem enganar. Embora sejam formas legítimas de expressão artística, podem ser confundidas com fatos reais em ambientes digitais onde as informações circulam rapidamente.
+    Conexão falsa: Ocorre quando títulos, imagens ou legendas não têm relação com o conteúdo da matéria. Essa prática visa atrair cliques e engajamento, mas engana o leitor ao apresentar informações desconectadas.
+    Conteúdo enganoso: Uso distorcido de informações verdadeiras para manipular a interpretação dos fatos. Pode envolver a seleção parcial de dados, estatísticas ou citações, bem como o uso de imagens de forma a induzir a erro.
+    Contexto falso: Informações verdadeiras são retiradas de seu contexto original e reapresentadas de maneira enganosa.
+    Conteúdo impostor: Ocorre quando alguém se passa por uma fonte confiável (instituições, veículos de imprensa ou pessoas públicas) para dar credibilidade a informações falsas.
+    Conteúdo manipulado: Conteúdo genuíno (como vídeos, imagens ou documentos) é alterado de forma intencional para enganar.
+    Conteúdo fabricado: Todo o conteúdo é falso, criado do zero. Pode ser textual, visual ou multimodal. Para analisar esse tipo de conteúdo, é útil considerar os elementos da desordem informacional: o agente (quem cria, produz ou distribui), a mensagem e os intérpretes. É essencial entender as motivações dos envolvidos e os tipos de mensagens disseminadas.
+    Deixe a classificação clara. Na linha debaixo, justifique sua resposta para tal classificação com base nos dados apresentados.
+    OBS: Responda com menos de 850 caracteres.""",
+                    file
+                ])
 
             self.client.files.delete(name = file.name)
 
 
             return f"{response_text}\n{fonts}"
     
-        elif type == "image":                                                                  
-            response_text = self.generate_response([
-                f"Transforme o conteúdo dessa imagem para uma pesquisa da web com o intuito de verificar a veracidade. Me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi.",
-                file
-            ])
+        elif type == "image":
+        
+            if object_if_is_old_message:
+                text = object_if_is_old_message["text"]
 
-            response_text, fonts = self.generate_response([
-                f"""Com base no conteúdo da imagem, pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da imagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. OBS: Responda com menos de 1000 caracteres.
-                """,
-                file
-            ], True)
+                response_text,_ = self.generate_response([
+                    f"Transforme o conteúdo dessa imagem e do texto: \"{text}\" para uma pesquisa da web com o intuito de verificar a veracidade. Me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi.",
+                    file
+                ])
 
-            response_text = self.generate_response([
-                f"""Analise detalhadamente o conteúdo presente na imagem. Analise a veracidade da imagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga ''✅ É fato' ou '❌ É fake' no começo da resposta. Diga que é fato apenas se todos os dados condizerem com as pesquisas, principalmente os temporais. 
-Se for fake news, com base nas definições a seguir, classifique o tipo de desinformação representado. As categorias são:
-Sátira ou paródia: Não têm a intenção de causar danos, mas podem enganar. Embora sejam formas legítimas de expressão artística, podem ser confundidas com fatos reais em ambientes digitais onde as informações circulam rapidamente.
-Conexão falsa: Ocorre quando títulos, imagens ou legendas não têm relação com o conteúdo da matéria. Essa prática visa atrair cliques e engajamento, mas engana o leitor ao apresentar informações desconectadas.
-Conteúdo enganoso: Uso distorcido de informações verdadeiras para manipular a interpretação dos fatos. Pode envolver a seleção parcial de dados, estatísticas ou citações, bem como o uso de imagens de forma a induzir a erro.
-Contexto falso: Informações verdadeiras são retiradas de seu contexto original e reapresentadas de maneira enganosa.
-Conteúdo impostor: Ocorre quando alguém se passa por uma fonte confiável (instituições, veículos de imprensa ou pessoas públicas) para dar credibilidade a informações falsas.
-Conteúdo manipulado: Conteúdo genuíno (como vídeos, imagens ou documentos) é alterado de forma intencional para enganar.
-Conteúdo fabricado: Todo o conteúdo é falso, criado do zero. Pode ser textual, visual ou multimodal. Para analisar esse tipo de conteúdo, é útil considerar os elementos da desordem informacional: o agente (quem cria, produz ou distribui), a mensagem e os intérpretes. É essencial entender as motivações dos envolvidos e os tipos de mensagens disseminadas.
-Deixe a classificação clara. Na linha debaixo, justifique sua resposta para tal classificação com base nos dados apresentados.
-OBS: Responda com menos de 1000 caracteres""",
-                file
-            ])
+                t = self.generate_response([
+                    f"""Com base no conteúdo da imagem e do texto \"{text}\", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da imagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. OBS: Responda com menos de 850 caracteres.
+                    """,
+                    file
+                ], True)
+
+                response_text, fonts = t
+
+                response_text,_ = self.generate_response([
+                    f"""Analise detalhadamente o conteúdo presente na imagem com base no texto \"{text}\",. Analise a veracidade da imagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga ''✅ É fato' ou '❌ É fake' no começo da resposta. Diga que é fato apenas se todos os dados condizerem com as pesquisas, principalmente os temporais. 
+    Se for fake news, com base nas definições a seguir, classifique o tipo de desinformação representado. As categorias são:
+    Sátira ou paródia: Não têm a intenção de causar danos, mas podem enganar. Embora sejam formas legítimas de expressão artística, podem ser confundidas com fatos reais em ambientes digitais onde as informações circulam rapidamente.
+    Conexão falsa: Ocorre quando títulos, imagens ou legendas não têm relação com o conteúdo da matéria. Essa prática visa atrair cliques e engajamento, mas engana o leitor ao apresentar informações desconectadas.
+    Conteúdo enganoso: Uso distorcido de informações verdadeiras para manipular a interpretação dos fatos. Pode envolver a seleção parcial de dados, estatísticas ou citações, bem como o uso de imagens de forma a induzir a erro.
+    Contexto falso: Informações verdadeiras são retiradas de seu contexto original e reapresentadas de maneira enganosa.
+    Conteúdo impostor: Ocorre quando alguém se passa por uma fonte confiável (instituições, veículos de imprensa ou pessoas públicas) para dar credibilidade a informações falsas.
+    Conteúdo manipulado: Conteúdo genuíno (como vídeos, imagens ou documentos) é alterado de forma intencional para enganar.
+    Conteúdo fabricado: Todo o conteúdo é falso, criado do zero. Pode ser textual, visual ou multimodal. Para analisar esse tipo de conteúdo, é útil considerar os elementos da desordem informacional: o agente (quem cria, produz ou distribui), a mensagem e os intérpretes. É essencial entender as motivações dos envolvidos e os tipos de mensagens disseminadas.
+    Deixe a classificação clara. Na linha debaixo, justifique sua resposta para tal classificação com base nos dados apresentados.
+    OBS: Responda com menos de 850 caracteres""",
+                    file
+                ])
+
+            else:
+                response_text,_ = self.generate_response([
+                    f"Transforme o conteúdo dessa imagem para uma pesquisa da web com o intuito de verificar a veracidade. Me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi.",
+                    file
+                ])
+
+                response_text, fonts = self.generate_response([
+                    f"""Com base no conteúdo da imagem, pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da imagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. OBS: Responda com menos de 850 caracteres.
+                    """,
+                    file
+                ], True)
+
+                response_text,_ = self.generate_response([
+                    f"""Analise detalhadamente o conteúdo presente na imagem. Analise a veracidade da imagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga ''✅ É fato' ou '❌ É fake' no começo da resposta. Diga que é fato apenas se todos os dados condizerem com as pesquisas, principalmente os temporais. 
+    Se for fake news, com base nas definições a seguir, classifique o tipo de desinformação representado. As categorias são:
+    Sátira ou paródia: Não têm a intenção de causar danos, mas podem enganar. Embora sejam formas legítimas de expressão artística, podem ser confundidas com fatos reais em ambientes digitais onde as informações circulam rapidamente.
+    Conexão falsa: Ocorre quando títulos, imagens ou legendas não têm relação com o conteúdo da matéria. Essa prática visa atrair cliques e engajamento, mas engana o leitor ao apresentar informações desconectadas.
+    Conteúdo enganoso: Uso distorcido de informações verdadeiras para manipular a interpretação dos fatos. Pode envolver a seleção parcial de dados, estatísticas ou citações, bem como o uso de imagens de forma a induzir a erro.
+    Contexto falso: Informações verdadeiras são retiradas de seu contexto original e reapresentadas de maneira enganosa.
+    Conteúdo impostor: Ocorre quando alguém se passa por uma fonte confiável (instituições, veículos de imprensa ou pessoas públicas) para dar credibilidade a informações falsas.
+    Conteúdo manipulado: Conteúdo genuíno (como vídeos, imagens ou documentos) é alterado de forma intencional para enganar.
+    Conteúdo fabricado: Todo o conteúdo é falso, criado do zero. Pode ser textual, visual ou multimodal. Para analisar esse tipo de conteúdo, é útil considerar os elementos da desordem informacional: o agente (quem cria, produz ou distribui), a mensagem e os intérpretes. É essencial entender as motivações dos envolvidos e os tipos de mensagens disseminadas.
+    Deixe a classificação clara. Na linha debaixo, justifique sua resposta para tal classificação com base nos dados apresentados.
+    OBS: Responda com menos de 850 caracteres""",
+                    file
+                ])
 
             self.client.files.delete(name = file.name)
             return response_text
@@ -192,7 +266,7 @@ OBS: Responda com menos de 1000 caracteres""",
         elif type == "text":
             text = content["text"]
 
-            response_text = self.generate_response([
+            response_text,_ = self.generate_response([
                 f"Analise a mensagem: \"{text}\"\n. Para verificar se é fake news ou não, me diga exatamente separado por linhas, os temas que precisam ser pesquisados, sem gerar dados temporais com base em seus conhecimentos desatualizados. OBS: Não diga mais nada além do que pedi"
             ])
             
@@ -200,18 +274,18 @@ OBS: Responda com menos de 1000 caracteres""",
                 f"""Com base na mensagem: "{text}", pesquise detalhadamente os seguintes assuntos: "{response_text}". Adapte os resultados ao contexto da mensagem, principalmente em relação ao tempo (atualidade), buscando sempre os mais recentes. Se for uma afirmação temporal, tente pequisar sobre ela em si."""
             ), True)
 
-            response_text = self.generate_response((
+            response_text,_ = self.generate_response((
                 f"""Analise a mensagem \"{text}\". Analise a veracidade da mensagem com os seguintes resultados de pesquisa: \"{response_text}\". Agora, diga '✅ É fato' ou '❌ É fake' no começo da resposta. Diga que é fato apenas se todos os dados condizerem com as pesquisas, principalmente os temporais. 
-Se for fake news, com base nas definições a seguir, classifique o tipo de desinformação representado. As categorias são:
-Sátira ou paródia: Não têm a intenção de causar danos, mas podem enganar. Embora sejam formas legítimas de expressão artística, podem ser confundidas com fatos reais em ambientes digitais onde as informações circulam rapidamente.
-Conexão falsa: Ocorre quando títulos, imagens ou legendas não têm relação com o conteúdo da matéria. Essa prática visa atrair cliques e engajamento, mas engana o leitor ao apresentar informações desconectadas.
-Conteúdo enganoso: Uso distorcido de informações verdadeiras para manipular a interpretação dos fatos. Pode envolver a seleção parcial de dados, estatísticas ou citações, bem como o uso de imagens de forma a induzir a erro.
-Contexto falso: Informações verdadeiras são retiradas de seu contexto original e reapresentadas de maneira enganosa.
-Conteúdo impostor: Ocorre quando alguém se passa por uma fonte confiável (instituições, veículos de imprensa ou pessoas públicas) para dar credibilidade a informações falsas.
-Conteúdo manipulado: Conteúdo genuíno (como vídeos, imagens ou documentos) é alterado de forma intencional para enganar.
-Conteúdo fabricado: Todo o conteúdo é falso, criado do zero. Pode ser textual, visual ou multimodal. Para analisar esse tipo de conteúdo, é útil considerar os elementos da desordem informacional: o agente (quem cria, produz ou distribui), a mensagem e os intérpretes. É essencial entender as motivações dos envolvidos e os tipos de mensagens disseminadas.
-Deixe a classificação clara. Na linha debaixo, justifique sua resposta para tal classificação com base nos dados apresentados.
-OBS: Responda com menos de 1000 caracteres"""
+    Se for fake news, com base nas definições a seguir, classifique o tipo de desinformação representado. As categorias são:
+    Sátira ou paródia: Não têm a intenção de causar danos, mas podem enganar. Embora sejam formas legítimas de expressão artística, podem ser confundidas com fatos reais em ambientes digitais onde as informações circulam rapidamente.
+    Conexão falsa: Ocorre quando títulos, imagens ou legendas não têm relação com o conteúdo da matéria. Essa prática visa atrair cliques e engajamento, mas engana o leitor ao apresentar informações desconectadas.
+    Conteúdo enganoso: Uso distorcido de informações verdadeiras para manipular a interpretação dos fatos. Pode envolver a seleção parcial de dados, estatísticas ou citações, bem como o uso de imagens de forma a induzir a erro.
+    Contexto falso: Informações verdadeiras são retiradas de seu contexto original e reapresentadas de maneira enganosa.
+    Conteúdo impostor: Ocorre quando alguém se passa por uma fonte confiável (instituições, veículos de imprensa ou pessoas públicas) para dar credibilidade a informações falsas.
+    Conteúdo manipulado: Conteúdo genuíno (como vídeos, imagens ou documentos) é alterado de forma intencional para enganar.
+    Conteúdo fabricado: Todo o conteúdo é falso, criado do zero. Pode ser textual, visual ou multimodal. Para analisar esse tipo de conteúdo, é útil considerar os elementos da desordem informacional: o agente (quem cria, produz ou distribui), a mensagem e os intérpretes. É essencial entender as motivações dos envolvidos e os tipos de mensagens disseminadas.
+    Deixe a classificação clara. Na linha debaixo, justifique sua resposta para tal classificação com base nos dados apresentados.
+    OBS: Responda com menos de 850 caracteres"""
             ))
             
             return f"{response_text}\n{fonts}"
@@ -234,50 +308,28 @@ OBS: Responda com menos de 1000 caracteres"""
         self.process_input(sender_id, instagram_account_id, message, text)
 
     # Retorna um dicionário com todos os dados necessários das postagens
-    def get_content_object(self, message, text):
+    def get_content_object(self, instagram_account_id, message, text):
         content = None
+        attachment_message_type = "new_message" if "attachments" in message else None
 
-        # Se for postagem compartilhada via aplicativo ou video/imagem enviado pela galeria
-        if "attachments" in message:
-            # Se for uma postagem compartilhada via aplicativo do tipo video
-            if message["attachments"][0]["type"] == "ig_reel":
-                content = { 
-                    "type": "video",
-                    "shortcode": int(message["attachments"][0]["payload"]["reel_video_id"]),
-                    "file_src": message["attachments"][0]["payload"]["url"],
-                    "caption": message["attachments"][0]["payload"]["title"] if "title" in message["attachments"][0]["payload"] else "",
-                    "is_media": True,
-                    "is_shared_reel": True,
-                    "is_link_shared_reel": False
-                }
+        if not attachment_message_type:
 
-            # Se for um video enviado pela galeria
-            elif message["attachments"][0]["type"] == "video":
-                content = { 
-                    "type": "video",
-                    "shortcode": message["attachments"][0]["payload"]["url"].split("=")[1].split("&")[0],
-                    "file_src": message["attachments"][0]["payload"]["url"],
-                    "caption": "",
-                    "is_media": True,
-                    "is_shared_reel": False,
-                    "is_link_shared_reel": False
-                }
-            # Se for uma postagem do tipo imagem compartilhada via aplicativo ou uma imagem enviada pela galeria
-            else:
+            # Se for o link direto de uma postagem
+            if text.startswith("https://www.instagram.com/p/") or text.startswith("https://www.instagram.com/reel/"):
+                shortcode = self.get_shortcode_from_url(text)
+                post = instaloader.Post.from_shortcode(self.L.context, shortcode)
+                caption = post.caption if post.caption else ""
                 content = {
-                    "type": "image",
-                    "shortcode": message["attachments"][0]["payload"]["url"].split("=")[1].split("&")[0],
-                    "file_src": message["attachments"][0]["payload"]["url"],
-                    "caption": "",
                     "is_media": True,
-                    "is_shared_reel": True,
-                    "is_link_shared_reel": False
+                    "is_link_shared_reel": False,
+                    "is_shared_reel": False,
+                    "shortcode": shortcode,
+                    "post": post,
+                    "caption": caption
                 }
 
-        # Se for uma postagem compartilhada em forma de link ou texto
-        else:
             # Se for uma postagem compartilhada em forma de link
-            if text.startswith("https://www.instagram.com/share/"):
+            elif text.startswith("https://www.instagram.com/share/"):
                 response = requests.get(text, allow_redirects=True)
                 url = response.url
                 shortcode = self.get_shortcode_from_url(url)
@@ -291,24 +343,75 @@ OBS: Responda com menos de 1000 caracteres"""
                     "post": post,
                     "caption": caption
                 }
+            
+            #se for apenas texto
+            else:
+                if instagram_account_id in posts:
+                    response_text,_ = self.generate_response([
+                        f"Analise a mensagem: \"{text}\"\n. Me retorne apenas 'Sim', se o texto estiver se referindo a algo ou utilizar algum pronome que dá sentido de referência a algo que não está no texto. caso contrário, retorne 'Não'"
+                    ])
+                    
+                    # se a mensagem se refeir a umas postagem previamente enviada
+                    if response_text.startswith("Sim"):
+                        attachment_message_type = "old_message"
+                    
+                    else:
+                        content = { "text": text }
 
-            # Se for o link direto de uma postagem
-            elif text.startswith("https://www.instagram.com/p/") or text.startswith("https://www.instagram.com/reel/"):
-                shortcode = self.get_shortcode_from_url(text)
-                post = instaloader.Post.from_shortcode(self.L.context, shortcode)
-                caption = post.caption if post.caption else ""
-                content = {
+                else:
+                    content = { "text": text }
+
+        # Se for postagem compartilhada via aplicativo ou video/imagem enviado pela galeria
+        if attachment_message_type == "new_message" or attachment_message_type == "old_message":
+
+            object_if_is_old_message = {
+                "instagram_account_id": instagram_account_id,
+                "text": text
+             } if attachment_message_type == "old_message" else None
+            
+            message_type = posts[instagram_account_id]["type"] if object_if_is_old_message else message["attachments"][0]["type"]
+            
+            # Se for uma postagem compartilhada via aplicativo do tipo video
+            if message_type == "ig_reel":
+                content = { 
+                    "type": "video",
+                    "shortcode": posts[instagram_account_id]["shortcode"] if object_if_is_old_message else int(message["attachments"][0]["payload"]["reel_video_id"]),
+                    "file_src": posts[instagram_account_id]["file_src"] if object_if_is_old_message else message["attachments"][0]["payload"]["url"],
+                    "caption": posts[instagram_account_id]["caption"] if object_if_is_old_message else message["attachments"][0]["payload"]["title"] if "title" in message["attachments"][0]["payload"] else "",
                     "is_media": True,
+                    "is_shared_reel": True,
                     "is_link_shared_reel": False,
-                    "is_shared_reel": False,
-                    "shortcode": shortcode,
-                    "post": post,
-                    "caption": caption
+                    "object_if_is_old_message": object_if_is_old_message,
                 }
 
-            # Se for texto
+            # Se for um video enviado pela galeria
+            elif message_type == "video":
+                content = { 
+                    "type": "video",
+                    "shortcode": posts[instagram_account_id]["shortcode"] if object_if_is_old_message else message["attachments"][0]["payload"]["url"].split("=")[1].split("&")[0],
+                    "file_src": posts[instagram_account_id]["file_src"] if object_if_is_old_message else message["attachments"][0]["payload"]["url"],
+                    "caption": "",
+                    "is_media": True,
+                    "is_shared_reel": False,
+                    "is_link_shared_reel": False,
+                    "object_if_is_old_message": object_if_is_old_message
+                }
+
+            # Se for uma postagem do tipo imagem compartilhada via aplicativo ou uma imagem enviada pela galeria
             else:
-                content = { "text": text }
+                content = {
+                    "type": "image",
+                    "shortcode": posts[instagram_account_id]["shortcode"] if object_if_is_old_message else message["attachments"][0]["payload"]["url"].split("=")[1].split("&")[0],
+                    "file_src": posts[instagram_account_id]["file_src"] if object_if_is_old_message else message["attachments"][0]["payload"]["url"],
+                    "caption": "",
+                    "is_media": True,
+                    "is_shared_reel": True,
+                    "is_link_shared_reel": False,
+                    "object_if_is_old_message": object_if_is_old_message
+                }
+
+        if attachment_message_type == "new_message":
+            posts[instagram_account_id] = content
 
         return content
     
@@ -317,12 +420,11 @@ OBS: Responda com menos de 1000 caracteres"""
         self.send_message_to_user(instagram_account_id, sender_id, "Estamos analisando o conteúdo. Pode demorar alguns segundos...")
         content = {}
         try:
-            content = self.get_content_object(message, text)
+            content = self.get_content_object(instagram_account_id, message, text)
         except instaloader.exceptions.BadResponseException as e:
             self.send_message_to_user(instagram_account_id, sender_id, "Link inválido. Verifique-o e tente novamente.")
             return
         response_text = self.get_result_from_process(content)
-
         self.send_message_to_user(instagram_account_id, sender_id, response_text)
 
     # Fornece os dados necessários para serem passados para o prompt
@@ -335,7 +437,8 @@ OBS: Responda com menos de 1000 caracteres"""
                 
                 new_content = {
                     "caption": content["caption"],
-                    "filename": filename
+                    "filename": filename,
+                    "object_if_is_old_message": content["object_if_is_old_message"]
                 }
                 return self.get_response_from_type(type, new_content)
 
